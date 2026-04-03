@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-04-03T13:55:38.882218+02:00 by Eclipse SUMO netedit 1.25.0
+-->
+
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <!-- VTypes -->
+    <vType id="high_blue" length="5.00" maxSpeed="13.90" color="blue" accel="2.6" decel="4.5" sigma="0.5"/>
+    <vType id="high_green" length="5.00" maxSpeed="13.90" color="green" accel="2.6" decel="4.5" sigma="0.5"/>
+    <vType id="high_orange" length="5.00" maxSpeed="13.90" color="255,165,0" accel="2.6" decel="4.5" sigma="0.5"/>
+    <vType id="high_purple" length="5.00" maxSpeed="13.90" color="160,32,240" accel="2.6" decel="4.5" sigma="0.5"/>
+    <vType id="high_red" length="5.00" maxSpeed="13.90" color="red" accel="2.6" decel="4.5" sigma="0.5"/>
+    <!-- Vehicles, persons and containers (sorted by depart) -->
+    <flow id="high_E19_1" type="high_green" begin="0.00" end="3600.00" period="2" departLane="best" from="E1.9" to="E3"/>
+    <flow id="high_E19_2" type="high_orange" begin="0.00" end="3600.00" period="4" departLane="best" from="E1.9" to="E5"/>
+    <flow id="high_E4_1" type="high_red" begin="0.00" end="3600.00" period="2" departLane="best" from="E4" to="E0"/>
+    <flow id="high_E4_2" type="high_blue" begin="0.00" end="3600.00" period="4" departLane="best" from="E4" to="E5"/>
+    <flow id="high_E6_1" type="high_green" begin="0.00" end="3600.00" period="2" departLane="best" from="E6" to="E0"/>
+    <flow id="high_E6_2" type="high_orange" begin="0.00" end="3600.00" period="4" departLane="best" from="E6" to="E0"/>
+    <flow id="high_E7_1" type="high_purple" begin="0.00" end="3600.00" period="2" departLane="best" from="E7" to="E10" via="E8"/>
+    <flow id="high_E7_2" type="high_red" begin="0.00" end="3600.00" period="4" departLane="best" from="E7" to="E3" via="E2"/>
+    <flow id="high_E7_3" type="high_blue" begin="0.00" end="3600.00" period="6" departLane="best" from="E7" to="E5" via="E2"/>
+    <flow id="high_E995_1" type="high_purple" begin="0.00" end="3600.00" period="2" departLane="best" from="E9.95" to="E19"/>
+    <flow id="high_E995_2" type="high_red" begin="0.00" end="3600.00" period="4" departLane="best" from="E9.95" to="E3" via="E2"/>
+    <flow id="high_E995_3" type="high_blue" begin="0.00" end="3600.00" period="6" departLane="best" from="E9.95" to="E5" via="E2"/>
+</routes>
