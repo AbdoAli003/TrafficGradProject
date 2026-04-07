@@ -21,9 +21,16 @@ else:
 import traci  # Static network information (such as reading and analyzing network files)
 
 # Step 4: Define Sumo configuration
+high = 0 
+medium = 1
+low = 2
+selected_demand = low
+rou_files = ["RL_high.rou.xml","RL_medium.rou.xml","RL_low.rou.xml"]
+selected_route = rou_files[selected_demand]
 Sumo_config = [
     'sumo-gui',
     '-c', 'RL.sumocfg',
+    '--route-files', selected_route,
     '--step-length', '0.10',
     '--delay', '1000',
     '--lateral-resolution', '0'
@@ -50,9 +57,9 @@ incoming_edges = list(set(
     if not traci.lane.getEdgeID(lane).startswith(":")
 ))
 tls_ids = list(traci.trafficlight.getIDList())
-print("TLS IDs:", tls_ids) #to depug
-print("incoming_edges :",incoming_edges) #to depug
-print("detectors IDS :",all_detectors) #to depug
+print("TLS IDs: - Baseline_Fixed_Time.py:60", tls_ids) #to depug
+print("incoming_edges : - Baseline_Fixed_Time.py:61",incoming_edges) #to depug
+print("detectors IDS : - Baseline_Fixed_Time.py:62",all_detectors) #to depug
 # ---- Reinforcement Learning Hyperparameters ----
 TOTAL_STEPS = 10000
 
@@ -92,11 +99,11 @@ def inject_breakdown(lane_id,edge_id, duration=100):
             duration=duration
         )
 
-        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps.")
+        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps. - Baseline_Fixed_Time.py:102")
         stopping_car = veh_id
 
     except traci.TraCIException:
-        print("not found")
+        print("not found - Baseline_Fixed_Time.py:106")
         pass  # Ignore errors if vehicle disappears
 
 def get_state():
@@ -136,7 +143,7 @@ cumulative_reward = 0.0
 cumulative_queue_reward = 0.0
 cumulative_delay_reward = 0.0
 
-print("\n=== Starting Fully Online Continuous Learning ===")
+print("\n=== Starting Fully Online Continuous Learning === - Baseline_Fixed_Time.py:146")
 for step in range(TOTAL_STEPS):
     current_simulation_step = step
     traci.simulationStep()
@@ -162,7 +169,7 @@ for step in range(TOTAL_STEPS):
         cumulative_queue_history.append(cumulative_queue_reward)
         cumulative_delay_history.append(cumulative_delay_reward)
 
-        print(f"Step {step}, Total Queue: {total_queue}, Total Delay: {total_delay}, "
+        print(f"Step {step}, Total Queue: {total_queue}, Total Delay: {total_delay}, - Baseline_Fixed_Time.py:172"
               f"Cumulative Queue Reward: {cumulative_queue_reward}, "
               f"Cumulative Delay Reward: {cumulative_delay_reward}")
 
@@ -180,7 +187,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, cumulative_queue_history, marker='o', linestyle='-', label="Cumulative Queue Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Queue Reward")
-plt.title("Fixed Timing: Cumulative Queue Reward over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Cumulative Queue Reward over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand)Fixed Timing: Cumulative Queue Reward over Steps")
+elif selected_demand == low:
+    plt.title("(low demand)Fixed Timing: Cumulative Queue Reward over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -190,7 +202,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, cumulative_delay_history, marker='o', linestyle='-', label="Cumulative Delay Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Delay Reward")
-plt.title("Fixed Timing: Cumulative Delay Reward over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Cumulative Delay Reward over Steps")
+elif selected_demand == medium:
+   plt.title("(medium demand)Fixed Timing: Cumulative Delay Reward over Steps")
+elif selected_demand == low:
+       plt.title("(low demand)Fixed Timing: Cumulative Delay Reward over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -200,7 +217,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, queue_history, marker='o', linestyle='-', label="Total Queue Length")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Queue Length")
-plt.title("Fixed Timing: Queue Length over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Queue Length over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand)Fixed Timing: Queue Length over Steps")
+elif selected_demand == low:
+    plt.title("(low demand)Fixed Timing: Queue Length over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -210,7 +232,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, delay_history, marker='o', linestyle='-', label="Total Vehicle Delay")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Delay (seconds)")
-plt.title("Fixed Timing: Total Vehicle Delay over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Total Vehicle Delay over Steps")
+elif selected_demand == medium:
+   plt.title("(medium demand)Fixed Timing: Total Vehicle Delay over Steps") 
+elif selected_demand == low:
+   plt.title("(low demand)Fixed Timing: Total Vehicle Delay over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -225,4 +252,9 @@ data = pd.DataFrame({
     "cum_delay": cumulative_delay_history
 })
 
-data.to_csv("combine graphs/Baseline_Fixed_Time_results.csv", index=False)
+if selected_demand == high :
+     data.to_csv("combine graphs/high_demand_Baseline_Fixed_result.csv", index=False)
+elif selected_demand == medium :
+     data.to_csv("combine graphs/medium_demand_Baseline_Fixed_result.csv", index=False)
+elif selected_demand == low:
+     data.to_csv("combine graphs/low_demand_Baseline_Fixed_result.csv", index=False)

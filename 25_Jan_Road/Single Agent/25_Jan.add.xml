@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-04-05T19:24:49.218248+02:00 by Eclipse SUMO netedit 1.25.0
+-->
+
+<additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
+    <!-- Detectors -->
+    <laneAreaDetector id="e2_0" lane="E7_1" pos="23.61" length="93.00" period="300.00" file="e2_0.xml"/>
+    <laneAreaDetector id="e2_1" lane="E7_0" pos="23.73" length="93.00" period="300.00" file="e2_1.xml"/>
+    <laneAreaDetector id="e2_10" lane="E4_1" pos="5.11" length="93.00" period="300.00" file="e2_10.xml"/>
+    <laneAreaDetector id="e2_11" lane="E4_0" pos="5.17" length="93.00" friendlyPos="1" period="300.00" file="e2_11.xml"/>
+    <laneAreaDetector id="e2_12" lane="E6_1" pos="2.99" length="93.00" friendlyPos="1" period="300.00" file="e2_12.xml"/>
+    <laneAreaDetector id="e2_13" lane="E6_0" pos="3.56" length="93.00" period="300.00" file="e2_13.xml"/>
+    <laneAreaDetector id="e2_14" lane="E1.9_0" pos="167.28" length="93.00" period="300.00" file="e2_14.xml"/>
+    <laneAreaDetector id="e2_15" lane="E1.9_1" pos="167.02" length="93.00" period="300.00" file="e2_15.xml"/>
+    <laneAreaDetector id="e2_2" lane="E7_2" pos="23.48" length="93.00" period="300.00" file="e2_2.xml"/>
+    <laneAreaDetector id="e2_3" lane="E9.95_1" pos="183.56" length="93.00" period="300.00" file="e2_3.xml"/>
+    <laneAreaDetector id="e2_4" lane="E9.95_2" pos="183.69" length="93.00" period="300.00" file="e2_4.xml"/>
+    <laneAreaDetector id="e2_5" lane="E9.95_0" pos="184.08" length="93.00" period="300.00" file="e2_5.xml"/>
+    <laneAreaDetector id="e2_6" lane="E2_0" pos="0.27" length="90.00" period="300.00" file="e2_6.xml"/>
+    <laneAreaDetector id="e2_7" lane="E2_1" pos="0.40" length="90.00" period="300.00" file="e2_7.xml"/>
+    <laneAreaDetector id="e2_8" lane="E2_2" pos="0.76" length="89.00" period="300.00" file="e2_8.xml"/>
+    <laneAreaDetector id="e2_9" lane="E2_3" pos="0.46" length="89.00" period="300.00" file="e2_9.xml"/>
+</additional>

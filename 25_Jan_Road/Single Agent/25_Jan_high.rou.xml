@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<routes xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/routes_file.xsd">
+    <vType id="car_blue" length="5.00" maxSpeed="13.90" color="0,0,255" accel="2.6" decel="4.5" sigma="0.5" lcStrategic="1.0" lcCooperative="1.0" lcSpeedGain="1.0" lcKeepRight="1.0"/>
+    <vType id="car_green" length="5.00" maxSpeed="13.90" color="0,255,0" accel="2.6" decel="4.5" sigma="0.5" lcStrategic="1.0" lcCooperative="1.0" lcSpeedGain="1.0" lcKeepRight="1.0"/>
+    <vType id="car_orange" length="5.00" maxSpeed="13.90" color="255,165,0" accel="2.6" decel="4.5" sigma="0.5" lcStrategic="1.0" lcCooperative="1.0" lcSpeedGain="1.0" lcKeepRight="1.0"/>
+    <vType id="car_purple" length="5.00" maxSpeed="13.90" color="160,32,240" accel="2.6" decel="4.5" sigma="0.5" lcStrategic="1.0" lcCooperative="1.0" lcSpeedGain="1.0" lcKeepRight="1.0"/>
+    <vType id="car_red" length="5.00" maxSpeed="13.90" color="255,0,0" accel="2.6" decel="4.5" sigma="0.5" lcStrategic="1.0" lcCooperative="1.0" lcSpeedGain="1.0" lcKeepRight="1.0"/>
+    
+    <flow id="f_E19_1" type="car_green" begin="0.00" end="3600.00" probability="0.3889" departLane="best" departSpeed="5.0" from="E1.9" to="E3"/>
+    <flow id="f_E19_2" type="car_orange" begin="0.00" end="3600.00" probability="0.0556" departLane="best" departSpeed="5.0" from="E1.9" to="E5"/>
+    
+    <flow id="f_E4_1" type="car_red" begin="0.00" end="3600.00" probability="0.3889" departLane="best" departSpeed="5.0" from="E4" to="E0"/>
+    <flow id="f_E4_2" type="car_blue" begin="0.00" end="3600.00" probability="0.0556" departLane="best" departSpeed="5.0" from="E4" to="E5"/>
+    
+    <flow id="f_E6_1" type="car_green" begin="0.00" end="3600.00" probability="0.3889" departLane="best" departSpeed="5.0" from="E6" to="E0"/>
+    <flow id="f_E6_2" type="car_orange" begin="0.00" end="3600.00" probability="0.0556" departLane="best" departSpeed="5.0" from="E6" to="E0"/>
+    
+    <flow id="f_E7_1" type="car_purple" begin="0.00" end="3600.00" probability="0.3889" departLane="best" departSpeed="5.0" from="E7" to="E10" via="E8"/>
+    <flow id="f_E7_2" type="car_red" begin="0.00" end="3600.00" probability="0.0556" departLane="best" departSpeed="5.0" from="E7" to="E3" via="E2"/>
+    <flow id="f_E7_3" type="car_blue" begin="0.00" end="3600.00" probability="0.0278" departLane="best" departSpeed="5.0" from="E7" to="E5" via="E2"/>
+    
+    <flow id="f_E995_1" type="car_purple" begin="0.00" end="3600.00" probability="0.3889" departLane="best" departSpeed="5.0" from="E9.95" to="E19"/>
+    <flow id="f_E995_2" type="car_red" begin="0.00" end="3600.00" probability="0.0556" departLane="best" departSpeed="5.0" from="E9.95" to="E3" via="E2"/>
+    <flow id="f_E995_3" type="car_blue" begin="0.00" end="3600.00" probability="0.0278" departLane="best" departSpeed="5.0" from="E9.95" to="E5" via="E2"/>
+</routes>

@@ -12,7 +12,7 @@ os.chdir(script_dir)
 
 # Step 1.1: (Additional) Imports for Deep Q-Learning
 import tensorflow as tf
-from tensorflow import keras
+from tensorflow import keras 
 from keras import layers
 from collections import deque
 
@@ -27,9 +27,16 @@ else:
 import traci  # Static network information (such as reading and analyzing network files)
 
 # Step 4: Define Sumo configuration
+high = 0 
+medium = 1
+low = 2
+selected_demand = low
+rou_files = ["RL_high.rou.xml","RL_medium.rou.xml","RL_low.rou.xml"]
+selected_route = rou_files[selected_demand]
 Sumo_config = [
     'sumo',   # Use GUI for visualization
     '-c', 'RL.sumocfg',
+    '--route-files', selected_route,
     '--step-length', '0.10',
     '--delay', '0',
     '--lateral-resolution', '0'
@@ -55,9 +62,9 @@ incoming_edges = list(set(
     if not traci.lane.getEdgeID(lane).startswith(":")
 ))
 tls_ids = list(traci.trafficlight.getIDList())
-print("TLS IDs: ", tls_ids) #to depug
-print("incoming_edges: ",incoming_edges) #to depug
-print("detectors_IDS: ",all_detectors) #to depug
+print("TLS IDs: - SingleAgent_DQN_Delay.py:65", tls_ids) #to depug
+print("incoming_edges: - SingleAgent_DQN_Delay.py:66",incoming_edges) #to depug
+print("detectors_IDS: - SingleAgent_DQN_Delay.py:67",all_detectors) #to depug
 
 TOTAL_STEPS = 10000
 ALPHA = 0.1
@@ -97,7 +104,7 @@ edge_detectors = {edge: [] for edge in edge_list}
 for det, edge in detector_edge_map.items():
     edge_detectors[edge].append(det)
 
-print("Edge groups:", edge_detectors)
+print("Edge groups: - SingleAgent_DQN_Delay.py:107", edge_detectors)
 # -------------------------
 # Step 7: Define Functions
 # -------------------------
@@ -133,11 +140,11 @@ def inject_breakdown(lane_id,edge_id, duration=100):
             duration=duration
         )
 
-        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps.")
+        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps. - SingleAgent_DQN_Delay.py:143")
         stopping_car = veh_id
 
     except traci.TraCIException:
-        print("not found")
+        print("not found - SingleAgent_DQN_Delay.py:147")
         pass  # Ignore errors if vehicle disappears
 
 def build_model(state_size, action_size):
@@ -315,7 +322,7 @@ delay_history = []
 cumulative_delay_history = []
 cumulative_reward = 0.0
 
-print("\n=== Starting Fully Online Continuous Learning (DQN, Minimize Delay) ===")
+print("\n=== Starting Fully Online Continuous Learning (DQN, Minimize Delay) === - SingleAgent_DQN_Delay.py:325")
 episodes = 1
 for episode in range(episodes):
   if episode !=0:
@@ -352,13 +359,13 @@ for episode in range(episodes):
        for target_var, online_var in zip(target_model.variables, dqn_model.variables):
            target_var.assign(TAU * online_var + (1 - TAU) * target_var)
     if step % 100 == 0:
-        print(f"\nepsilon : {EPSILON}")
+        print(f"\nepsilon : {EPSILON} - SingleAgent_DQN_Delay.py:362")
         total_queue = sum(new_state[:-NUM_TLS])
         step_history.append(step)
         delay_history.append(-reward)
         queue_history.append(total_queue)
         cumulative_delay_history.append(cumulative_reward)
-        print(f"Step {step}, Total Delay: {reward}, Total Queue: {total_queue}, Cumulative Delay Reward: {cumulative_reward}")
+        print(f"Step {step}, Total Delay: {reward}, Total Queue: {total_queue}, Cumulative Delay Reward: {cumulative_reward} - SingleAgent_DQN_Delay.py:368")
   # -------------------------
   # Step 9: Close connection between SUMO and Traci
   # -------------------------
@@ -369,8 +376,8 @@ for episode in range(episodes):
 # -------------------------
 
 # ~~~ Print final model summary (replacing Q-table info) ~~~
-print("\nOnline Training completed.")
-print("DQN Model Summary:")
+print("\nOnline Training completed. - SingleAgent_DQN_Delay.py:379")
+print("DQN Model Summary: - SingleAgent_DQN_Delay.py:380")
 dqn_model.summary()
 
 # Plot Cumulative Delay Reward
@@ -378,7 +385,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, cumulative_delay_history, marker='o', linestyle='-', label="Cumulative Delay Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Delay Reward")
-plt.title("RL Training (DQN): Cumulative Delay Reward over Steps")
+if selected_demand == high:
+   plt.title("(high demand)RL Training (DQN): Cumulative Delay Reward over Steps")
+elif selected_demand == medium:
+   plt.title("(medium demand)RL Training (DQN): Cumulative Delay Reward over Steps")
+elif selected_demand == low:
+   plt.title("(low demand)RL Training (DQN): Cumulative Delay Reward over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -388,7 +400,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, delay_history, marker='o', linestyle='-', label="Total Vehicle Delay")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Delay (seconds)")
-plt.title("RL Training (DQN): Total Vehicle Delay over Steps")
+if selected_demand == high:
+    plt.title("(high demand)RL Training (DQN): Total Vehicle Delay over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand)RL Training (DQN): Total Vehicle Delay over Steps")
+elif selected_demand == low:
+    plt.title("(low demand)RL Training (DQN): Total Vehicle Delay over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -398,7 +415,13 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, queue_history, marker='o', linestyle='-', label="Total Queue Length")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Queue Length")
-plt.title("RL Training (DQN): Total Queue Length over Steps")
+if selected_demand == high:
+    plt.title("(high demand)RL Training (DQN): Total Queue Length over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand)RL Training (DQN): Total Queue Length over Steps")
+elif selected_demand == low:
+    plt.title("(low demand)RL Training (DQN): Total Queue Length over Steps")
+
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -411,5 +434,9 @@ data = pd.DataFrame({
     "delay": delay_history,
     "cum_delay": cumulative_delay_history
 })
-
-data.to_csv("combine graphs/SingleAgent_DQN_Delay_results.csv", index=False)
+if selected_demand == high :
+    data.to_csv("combine graphs/high_demand_SingleAgent_DQN_Delay_results.csv", index=False)
+elif selected_demand == medium :
+    data.to_csv("combine graphs/medium_demand_SingleAgent_DQN_Delay_results.csv", index=False)
+elif selected_demand == low :
+    data.to_csv("combine graphs/low_demand_SingleAgent_DQN_Delay_results.csv", index=False)

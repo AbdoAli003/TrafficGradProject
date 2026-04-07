@@ -23,9 +23,16 @@ else:
 import traci  # Static network information (such as reading and analyzing network files)
 
 # Step 4: Define Sumo configuration
+high = 0 
+medium = 1
+low = 2
+selected_demand = low
+rou_files = ["RL_high.rou.xml","RL_medium.rou.xml","RL_low.rou.xml"]
+selected_route = rou_files[selected_demand]
 Sumo_config = [
     'sumo-gui',
     '-c', 'RL.sumocfg',
+    '--route-files', selected_route,
     '--step-length', '0.10',
     '--delay', '1000',
     '--lateral-resolution', '0'
@@ -52,7 +59,7 @@ incoming_edges = list(set(
     if not traci.lane.getEdgeID(lane).startswith(":")
 ))
 tls_ids = list(traci.trafficlight.getIDList())
-print("TLS IDs:", tls_ids) #to depug
+print("TLS IDs: - SingleAgent_QLearning_Delay.py:62", tls_ids) #to depug
 print(incoming_edges) #to depug
 print(all_detectors) #to depug
 
@@ -99,7 +106,7 @@ edge_detectors = {edge: [] for edge in edge_list}
 for det, edge in detector_edge_map.items():
     edge_detectors[edge].append(det)
 
-print("Edge groups:", edge_detectors)
+print("Edge groups: - SingleAgent_QLearning_Delay.py:109", edge_detectors)
 # -------------------------
 # Step 7: Define Functions
 # -------------------------
@@ -135,11 +142,11 @@ def inject_breakdown(lane_id,edge_id, duration=100):
             duration=duration
         )
 
-        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps.")
+        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps. - SingleAgent_QLearning_Delay.py:145")
         stopping_car = veh_id
 
     except traci.TraCIException:
-        print("not found")
+        print("not found - SingleAgent_QLearning_Delay.py:149")
         pass  # Ignore errors if vehicle disappears
 
 def get_max_Q_value_of_state(s):
@@ -258,7 +265,7 @@ queue_history = []
 delay_history = []
 cumulative_reward = 0.0
 
-print("\n=== Starting Fully Online Continuous Learning ===")
+print("\n=== Starting Fully Online Continuous Learning === - SingleAgent_QLearning_Delay.py:268")
 episodes = 1
 for episode in range(episodes):
   if episode !=0:
@@ -318,23 +325,23 @@ for episode in range(episodes):
     """
     # Record data every step
     if step % 100 == 0:
-      print(f"\nstate:{state}")
-      print(f"epsilon :{EPSILON}")
-      print(f"Step {step}, Current_State: {state}, Action: {action}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f}, Q-values(current_state): {updated_q_vals}")
+      print(f"\nstate:{state} - SingleAgent_QLearning_Delay.py:328")
+      print(f"epsilon :{EPSILON} - SingleAgent_QLearning_Delay.py:329")
+      print(f"Step {step}, Current_State: {state}, Action: {action}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f}, Qvalues(current_state): {updated_q_vals} - SingleAgent_QLearning_Delay.py:330")
       step_history.append(step)
       reward_history.append(cumulative_reward)
       queue_history.append(sum(new_state[:-len(tls_ids)]))
       delay_history.append(-reward)
-      print(f"Current Q-table length {len(Q_table)}:")
+      print(f"Current Qtable length {len(Q_table)}: - SingleAgent_QLearning_Delay.py:335")
   # -------------------------
   # Step 9: Close connection between SUMO and Traci
   # -------------------------
   traci.close()
 
 # Print final Q-table info
-print("\nOnline Training completed. Final Q-table size:", len(Q_table))
+print("\nOnline Training completed. Final Qtable size: - SingleAgent_QLearning_Delay.py:342", len(Q_table))
 for st, actions in Q_table.items():
-    print("State:", st, "-> Q-values:", actions)
+    print("State: - SingleAgent_QLearning_Delay.py:344", st, "-> Q-values:", actions)
 
 # -------------------------
 # Visualization of Results
@@ -345,7 +352,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, reward_history, marker='o', linestyle='-', label="Cumulative Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Reward")
-plt.title("RL Training: Cumulative delay Reward over Steps")
+if selected_demand == high :
+    plt.title("(high demand)RL Training: Cumulative delay Reward over Steps")
+elif selected_demand == medium :
+    plt.title("(medium demand)RL Training: Cumulative delay Reward over Steps")
+elif selected_demand == low :
+    plt.title("(low demand)RL Training: Cumulative delay Reward over Steps")
 plt.legend()
 plt.grid(True) 
 plt.show()
@@ -355,7 +367,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, queue_history, marker='o', linestyle='-', label="Total Queue Length")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Queue Length")
-plt.title("RL Training: Queue Length over Steps")
+if selected_demand == high :
+     plt.title("(high demand)RL Training: Queue Length over Steps")
+elif selected_demand == medium :
+     plt.title("(medium demand)RL Training: Queue Length over Steps")
+elif selected_demand == low :
+     plt.title("(low demand)RL Training: Queue Length over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -365,7 +382,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, delay_history, marker='o', linestyle='-', label="Total Delay")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Delay (seconds)")
-plt.title("RL Training: Total Delay over Steps")
+if selected_demand == high :
+     plt.title("(high demand)RL Training: Total Delay over Steps")
+elif selected_demand == medium :
+     plt.title("(medium demand)RL Training: Total Delay over Steps")
+elif selected_demand == low :
+     plt.title("(low demand)RL Training: Total Delay over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -378,5 +400,9 @@ data = pd.DataFrame({
     "delay": delay_history,
     "cum_delay": reward_history
 })
-
-data.to_csv("combine graphs/SingleAgent_QLearning_Delay_results.csv", index=False)
+if selected_demand == high :
+    data.to_csv("combine graphs/high_demand_SingleAgent_QLearning_Delay_results.csv", index=False)
+elif selected_demand == medium :
+    data.to_csv("combine graphs/medium_demand_SingleAgent_QLearning_Delay_results.csv", index=False)
+elif selected_demand == low :
+    data.to_csv("combine graphs/low_demand_SingleAgent_QLearning_Delay_results.csv", index=False)
