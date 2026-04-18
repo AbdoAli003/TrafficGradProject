@@ -330,6 +330,36 @@ def get_queue_length(detector_id): #8.Constraint 8
 def get_current_phase(tls_id): #8.Constraint 8
     return traci.trafficlight.getPhase(tls_id)
 
+
+def get_network_min_ttc(safe_threshold=50.0):
+    """
+    Calculates the minimum Time To Collision (TTC) across all vehicles currently in the network.
+    Returns safe_threshold if no vehicles are on a collision course.
+    """
+    min_ttc = safe_threshold
+    vehicles = traci.vehicle.getIDList()
+    
+    for veh_id in vehicles:
+        # getLeader returns a tuple (leader_id, distance) or None
+        leader_info = traci.vehicle.getLeader(veh_id, 0.0) 
+        
+        if leader_info is not None:
+            leader_id, distance = leader_info
+            v_follower = traci.vehicle.getSpeed(veh_id)
+            v_leader = traci.vehicle.getSpeed(leader_id)
+            
+            # TTC is only valid if the follower is faster than the leader
+            if v_follower > v_leader:
+                relative_speed = v_follower - v_leader
+                # Prevent division by zero just in case
+                if relative_speed > 0: 
+                    ttc = distance / relative_speed
+                    if ttc < min_ttc:
+                        min_ttc = ttc
+                        
+    return min_ttc
+
+
 # -------------------------
 # Step 8: Fully Online Continuous Learning Loop
 # -------------------------
@@ -338,6 +368,7 @@ def get_current_phase(tls_id): #8.Constraint 8
 step_history = []
 reward_history = []
 queue_history = []
+ttc_history = []
 
 cumulative_reward = 0.0
 
@@ -393,6 +424,8 @@ for episode in range(episodes):
         step_history.append(step)
         reward_history.append(cumulative_reward)
         queue_history.append(sum(new_state[:-NUM_TLS]))  # sum of queue lengths
+        current_min_ttc = get_network_min_ttc()
+        ttc_history.append(current_min_ttc)
     # -------------------------
     # Step 9: Close connection between SUMO and Traci
     # -------------------------
@@ -437,6 +470,25 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
+
+# Plot Minimum TTC over Simulation Steps
+plt.figure(figsize=(10, 6))
+plt.plot(step_history, ttc_history, marker='o', linestyle='-', color='red', label="Network Min TTC")
+plt.xlabel("Simulation Step")
+plt.ylabel("Minimum Time to Collision (Seconds)")
+plt.axhline(y=3.0, color='orange', linestyle='--', label='Critical Threshold (3s)') # Optional: Reference line for danger
+
+if selected_demand == high:
+    plt.title("(high demand) RL Safety: Min TTC over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand) RL Safety: Min TTC over Steps")
+elif selected_demand == low:
+    plt.title("(low demand) RL Safety: Min TTC over Steps")
+    
+plt.legend()
+plt.grid(True)
+plt.show()
+
 #save results plotted in csv file
 
 data = pd.DataFrame({
@@ -451,3 +503,19 @@ elif selected_demand == medium :
 elif selected_demand == low :
      data.to_csv("combine graphs/low_demand_SingleAgent_DQN_Queue_results.csv", index=False)
 
+# ==========================================
+# TTC Data Export 
+# ==========================================
+
+# Save TTC results in a separate CSV file
+ttc_data = pd.DataFrame({
+    "step": step_history,
+    "min_ttc": ttc_history
+})
+
+if selected_demand == high:
+    ttc_data.to_csv("combine graphs/high_demand_SingleAgent_DQN_Delay_TTC_results.csv", index=False)
+elif selected_demand == medium:
+    ttc_data.to_csv("combine graphs/medium_demand_SingleAgent_DQN_Delay_TTC_results.csv", index=False)
+elif selected_demand == low:
+    ttc_data.to_csv("combine graphs/low_demand_SingleAgent_DQN_Delay_TTC_results.csv", index=False)

@@ -255,6 +255,35 @@ def get_queue_length(detector_id): #8.Constraint 8
 def get_current_phase(tls_id): #8.Constraint 8
     return traci.trafficlight.getPhase(tls_id)
 
+def get_network_min_ttc(safe_threshold=50.0):
+    """
+    Calculates the minimum Time To Collision (TTC) across all vehicles currently in the network.
+    Returns safe_threshold if no vehicles are on a collision course.
+    """
+    min_ttc = safe_threshold
+    vehicles = traci.vehicle.getIDList()
+    
+    for veh_id in vehicles:
+        # getLeader returns a tuple (leader_id, distance) or None
+        leader_info = traci.vehicle.getLeader(veh_id, 0.0) 
+        
+        if leader_info is not None:
+            leader_id, distance = leader_info
+            v_follower = traci.vehicle.getSpeed(veh_id)
+            v_leader = traci.vehicle.getSpeed(leader_id)
+            
+            # TTC is only valid if the follower is faster than the leader
+            if v_follower > v_leader:
+                relative_speed = v_follower - v_leader
+                # Prevent division by zero just in case
+                if relative_speed > 0: 
+                    ttc = distance / relative_speed
+                    if ttc < min_ttc:
+                        min_ttc = ttc
+                        
+    return min_ttc
+
+
 # -------------------------
 # Step 8: Fully Online Continuous Learning Loop
 # -------------------------
@@ -264,6 +293,7 @@ step_history = []
 reward_history = []
 queue_history = []
 delay_history = []
+ttc_history = []
 
 
 print("\n=== Starting Fully Online Continuous Learning === - MultiAgent_QLearning_Queue.py:269")
@@ -276,6 +306,7 @@ for episode in range(episodes):
   reward_history = []
   queue_history = []
   delay_history = []
+  ttc_history = []
   cumulative_queue_reward = 0.0
   EPSILON = 1.0 - episode/episodes
   print(f"start of episode {episode} - MultiAgent_QLearning_Queue.py:281")
@@ -331,6 +362,8 @@ for episode in range(episodes):
           total_delay += traci.edge.getWaitingTime(edge_id)
         delay_history.append(total_delay)
         queue_history.append(sum(new_state[:-len(tls_ids)]))  # sum of queue lengths
+        current_min_ttc = get_network_min_ttc()
+        ttc_history.append(current_min_ttc)
         for tls in tls_ids:
            print(f"TLS {tls} Qtable size: {len(Q_tables[tls])} - MultiAgent_QLearning_Queue.py:335")
   # -------------------------
@@ -389,6 +422,25 @@ plt.legend()
 plt.grid(True)
 plt.show()
 
+
+# Plot Minimum TTC over Simulation Steps
+plt.figure(figsize=(10, 6))
+plt.plot(step_history, ttc_history, marker='o', linestyle='-', color='red', label="Network Min TTC")
+plt.xlabel("Simulation Step")
+plt.ylabel("Minimum Time to Collision (Seconds)")
+plt.axhline(y=3.0, color='orange', linestyle='--', label='Critical Threshold (3s)') # Optional: Reference line for danger
+
+if selected_demand == high:
+    plt.title("(high demand) RL Safety: Min TTC over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand) RL Safety: Min TTC over Steps")
+elif selected_demand == low:
+    plt.title("(low demand) RL Safety: Min TTC over Steps")
+    
+plt.legend()
+plt.grid(True)
+plt.show()
+
 #save results plotted in csv file
 
 data = pd.DataFrame({
@@ -403,3 +455,21 @@ elif selected_demand == medium:
     data.to_csv("combine graphs/medium_demand_MultiAgent_QLearning_Queue_results.csv", index=False)
 elif selected_demand == low :
     data.to_csv("combine graphs/low_demand_MultiAgent_QLearning_Queue_results.csv", index=False)
+
+
+# ==========================================
+# TTC Data Export 
+# ==========================================
+
+# Save TTC results in a separate CSV file
+ttc_data = pd.DataFrame({
+    "step": step_history,
+    "min_ttc": ttc_history
+})
+
+if selected_demand == high:
+    ttc_data.to_csv("combine graphs/high_demand_MultiAgent_QLearning_Queue_TTC_results.csv", index=False)
+elif selected_demand == medium:
+    ttc_data.to_csv("combine graphs/medium_demand_MultiAgent_QLearning_Queue_TTC_results.csv", index=False)
+elif selected_demand == low:
+    ttc_data.to_csv("combine graphs/low_demand_MultiAgent_QLearning_Queue_TTC_results.csv", index=False)
