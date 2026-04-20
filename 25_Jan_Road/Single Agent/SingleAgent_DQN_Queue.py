@@ -514,8 +514,8 @@ ttc_data = pd.DataFrame({
 })
 
 if selected_demand == high:
-    ttc_data.to_csv("combine graphs/high_demand_SingleAgent_DQN_Delay_TTC_results.csv", index=False)
+    ttc_data.to_csv("combine graphs/high_demand_SingleAgent_DQN_Queue_TTC_results.csv", index=False)
 elif selected_demand == medium:
-    ttc_data.to_csv("combine graphs/medium_demand_SingleAgent_DQN_Delay_TTC_results.csv", index=False)
+    ttc_data.to_csv("combine graphs/medium_demand_SingleAgent_DQN_Queue_TTC_results.csv", index=False)
 elif selected_demand == low:
-    ttc_data.to_csv("combine graphs/low_demand_SingleAgent_DQN_Delay_TTC_results.csv", index=False)
+    ttc_data.to_csv("combine graphs/low_demand_SingleAgent_DQN_Queue_TTC_results.csv", index=False)
