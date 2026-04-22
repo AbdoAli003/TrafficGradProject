@@ -1,14 +1,22 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-04-05T19:46:21.678678+02:00 by Eclipse SUMO sumo 1.25.0
+<!-- generated on 2026-04-17T23:34:19.318941+02:00 by Eclipse SUMO sumo 1.25.0
 -->
 
 <sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
+
+    <configuration>
+        <configuration-file value=""/>
+    </configuration>
 
     <input>
         <net-file value="25_Jan.net.xml"/>
         <route-files value="25_Jan_high.rou.xml"/>
         <additional-files value="25_Jan.add.xml"/>
     </input>
+
+    <gui_only>
+        <edgedata-files value=""/>
+    </gui_only>
 
 </sumoConfiguration>
