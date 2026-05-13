@@ -27,9 +27,16 @@ else:
 import traci  # Static network information (such as reading and analyzing network files)
 
 # Step 4: Define Sumo configuration
+high = 0 
+medium = 1
+low = 2
+selected_demand = low
+rou_files = ["RL_high.rou.xml","RL_medium.rou.xml","RL_low.rou.xml"]
+selected_route = rou_files[selected_demand]
 Sumo_config = [
     'sumo',   # <-- change from 'sumo' to 'sumo-gui'
     '-c', 'RL.sumocfg',
+    '--route-files', selected_route,
     '--step-length', '0.10',
     '--delay', '0',
     '--lateral-resolution', '0'
@@ -57,9 +64,9 @@ incoming_edges = list(set(
     if not traci.lane.getEdgeID(lane).startswith(":")
 ))
 tls_ids = list(traci.trafficlight.getIDList())
-print("TLS IDs: ", tls_ids) #to depug
-print("incoming_edges: ",incoming_edges) #to depug
-print("detectors_IDS: ",all_detectors) #to depug
+print("TLS IDs: - MultiAgent_DQN_Queue.py:67", tls_ids) #to depug
+print("incoming_edges: - MultiAgent_DQN_Queue.py:68",incoming_edges) #to depug
+print("detectors_IDS: - MultiAgent_DQN_Queue.py:69",all_detectors) #to depug
 
 # ---- Reinforcement Learning Hyperparameters ----
 TOTAL_STEPS = 10000    # The total number of simulation steps for continuous (online) training.
@@ -79,9 +86,14 @@ EPSILON_DECAY = 0.992
 # ---- Additional Stability Parameters ----
 MIN_GREEN_STEPS = 120
 last_switch_step = -MIN_GREEN_STEPS
-REPLAY_BUFFER = deque(maxlen=200000)
 BATCH_SIZE = 128
 TARGET_UPDATE_FREQ = 200  # update every 500 steps
+
+# Multi-agent structures
+last_switch_step = {tls:-MIN_GREEN_STEPS for tls in tls_ids}
+dqn_models = {}
+target_models = {}
+replay_buffers = {}
 
 # Map each detector to its edge
 detector_edge_map = {}
@@ -104,7 +116,7 @@ edge_detectors = {edge: [] for edge in edge_list}
 for det, edge in detector_edge_map.items():
     edge_detectors[edge].append(det)
 
-print("Edge groups:", edge_detectors)
+print("Edge groups: - MultiAgent_DQN_Queue.py:119", edge_detectors)
 # -------------------------
 # Step 7: Define Functions
 # -------------------------
@@ -140,11 +152,11 @@ def inject_breakdown(lane_id,edge_id, duration=100):
             duration=duration
         )
 
-        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps.")
+        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps. - MultiAgent_DQN_Queue.py:155")
         stopping_car = veh_id
 
     except traci.TraCIException:
-        print("not found")
+        print("not found - MultiAgent_DQN_Queue.py:159")
         pass  # Ignore errors if vehicle disappears
 
 def build_model(state_size, action_size):
@@ -187,15 +199,19 @@ def to_array(state_tuple):
     state[:-NUM_TLS] = np.clip(state[:-NUM_TLS] / 10.0, 0, 1)   # normalize queues (assuming max 50 cars)
     return state.reshape((1, -1))
 
-state_size = len(incoming_edges) + NUM_TLS  # incoming edges + tlses
+state_size = len(incoming_edges) + NUM_TLS  # incoming edges + tls per agent
 action_size = len(ACTIONS)
-dqn_model = build_model(state_size, action_size)
-target_model = build_model(state_size, action_size)
-target_model.set_weights(dqn_model.get_weights())
+# create models per agent
+for tls in tls_ids:
+
+    dqn_models[tls] = build_model(state_size, action_size)
+    target_models[tls] = build_model(state_size, action_size)
+    target_models[tls].set_weights(dqn_models[tls].get_weights())
+    replay_buffers[tls] = deque(maxlen=200000)
 
 def get_max_Q_value_of_state(s): #1. Objective Function
     state_array = to_array(s)
-    Q_values = dqn_model(state_array, training=False).numpy()[0]
+    Q_values = dqn_models(state_array, training=False).numpy()[0]
     return np.max(Q_values)
 
 def get_reward(state): #2. Constraint 2 
@@ -225,68 +241,55 @@ def get_state():
     # state = queues + phases
     return tuple(queues + phases)
 
-def apply_action(action): #5. Constraint 5
+def apply_action(actions):
+
     global last_switch_step, current_simulation_step
 
-    if current_simulation_step - last_switch_step < MIN_GREEN_STEPS:
-        return
+    for tls in tls_ids:
+        action = actions[tls]
 
-    is_switched = 0
-    # Decode action to binary vector
-    for i, tls in enumerate(tls_ids):
+        if current_simulation_step - last_switch_step[tls] < MIN_GREEN_STEPS:
+            continue
 
-        if action == 1:   # if bit is 1 → switch
-            is_switched = 1
+        if action == 1:
             program = traci.trafficlight.getAllProgramLogics(tls)[0]
             num_phases = len(program.phases)
-
             next_phase = (get_current_phase(tls) + 1) % num_phases
-
             traci.trafficlight.setPhase(tls, next_phase)
-    if is_switched == 1:
-       last_switch_step = current_simulation_step
+            last_switch_step[tls] = current_simulation_step
 
-def update_Q_table(old_state, action, reward, new_state): #6. Constraint 6
-    """
-    In DQN, we do a single-step gradient update instead of a table update.
-    """
-    # Store experience
-    REPLAY_BUFFER.append((old_state, action, reward, new_state))
+def update_Q_table(tls, old_state, action, reward, new_state):
 
-    if len(REPLAY_BUFFER) < BATCH_SIZE:
+    replay_buffers[tls].append((old_state,action,reward,new_state))
+
+    if len(replay_buffers[tls]) < BATCH_SIZE:
         return
 
-    minibatch = random.sample(REPLAY_BUFFER, BATCH_SIZE)
+    minibatch = random.sample(replay_buffers[tls], BATCH_SIZE)
+    states = np.array([to_array(s)[0] for s,_,_,_ in minibatch])
+    next_states = np.array([to_array(s2)[0] for _,_,_,s2 in minibatch])
 
-    states = np.array([to_array(s)[0] for s, _, _, _ in minibatch])
-    next_states = np.array([to_array(s_next)[0] for _, _, _, s_next in minibatch])
-
-    actions = [a for _, a, _, _ in minibatch]
-    rewards = [r for _, _, r, _ in minibatch]
-
-    # Predict in batch
-    current_q = dqn_model(states, training=False).numpy()
-    next_q_online = dqn_model(next_states, training=False).numpy()
-    next_q_target = target_model(next_states, training=False).numpy()
-
-    best_actions = np.argmax(next_q_online, axis=1)
-
+    actions = [a for _,a,_,_ in minibatch]
+    rewards = [r for _,_,r,_ in minibatch]
+    current_q = dqn_models[tls](states,training=False).numpy()
+    next_q_online = dqn_models[tls](next_states,training=False).numpy()
+    next_q_target = target_models[tls](next_states,training=False).numpy()
+    best_actions = np.argmax(next_q_online,axis=1)
     targets = rewards + GAMMA * next_q_target[np.arange(BATCH_SIZE), best_actions]
+    current_q[np.arange(BATCH_SIZE),actions] = targets
+    dqn_models[tls].fit(states,current_q,verbose=0)
 
-    current_q[np.arange(BATCH_SIZE), actions] = targets
+def get_action_from_policy(state, tls):
 
-    dqn_model.fit(states, current_q, verbose=0)
+    global EPSILON
 
-def get_action_from_policy(state): #7. Constraint 7
-    """
-    Epsilon-greedy strategy using the DQN's predicted Q-values.
-    """
     if random.random() < EPSILON:
         return random.choice(ACTIONS)
-    else:
-        state_array = to_array(state)
-        Q_values = dqn_model(state_array, training=False).numpy()[0]
-        return int(np.argmax(Q_values))
+
+    state_array = to_array(state)
+    Q_values = dqn_models[tls](state_array, training=False).numpy()[0]
+
+    return int(np.argmax(Q_values))
 
 def compress_state(state):
 
@@ -322,6 +325,35 @@ def get_queue_length(detector_id): #8.Constraint 8
 def get_current_phase(tls_id): #8.Constraint 8
     return traci.trafficlight.getPhase(tls_id)
 
+
+def get_network_min_ttc(safe_threshold=50.0):
+    """
+    Calculates the minimum Time To Collision (TTC) across all vehicles currently in the network.
+    Returns safe_threshold if no vehicles are on a collision course.
+    """
+    min_ttc = safe_threshold
+    vehicles = traci.vehicle.getIDList()
+    
+    for veh_id in vehicles:
+        # getLeader returns a tuple (leader_id, distance) or None
+        leader_info = traci.vehicle.getLeader(veh_id, 0.0) 
+        
+        if leader_info is not None:
+            leader_id, distance = leader_info
+            v_follower = traci.vehicle.getSpeed(veh_id)
+            v_leader = traci.vehicle.getSpeed(leader_id)
+            
+            # TTC is only valid if the follower is faster than the leader
+            if v_follower > v_leader:
+                relative_speed = v_follower - v_leader
+                # Prevent division by zero just in case
+                if relative_speed > 0: 
+                    ttc = distance / relative_speed
+                    if ttc < min_ttc:
+                        min_ttc = ttc
+                        
+    return min_ttc
+
 # -------------------------
 # Step 8: Fully Online Continuous Learning Loop
 # -------------------------
@@ -330,10 +362,11 @@ def get_current_phase(tls_id): #8.Constraint 8
 step_history = []
 reward_history = []
 queue_history = []
+ttc_history = []
 
 cumulative_reward = 0.0
 
-print("\n=== Starting Fully Online Continuous Learning (DQN) ===")
+print("\n=== Starting MultiAgent Fully Online Continuous Learning (DQN) === - MultiAgent_DQN_Queue.py:339")
 episodes = 1
 for episode in range(episodes):
   if episode !=0:
@@ -341,10 +374,11 @@ for episode in range(episodes):
   step_history = []
   reward_history = []
   queue_history = []
+  ttc_history = []
   cumulative_reward = 0.0
 
   action_step = 0
-  last_action = []
+  last_actions = {}
   last_action_state = []
   for step in range(TOTAL_STEPS):
     current_simulation_step = step  # keep this variable for apply_action usage
@@ -353,11 +387,14 @@ for episode in range(episodes):
        inject_breakdown("Node1_2_EB_1","Node1_2_EB")
     """
     state = get_state()
+    compressed_state = compress_state(state)
     if step % 1 == 0:
       action_step = step
-      action = get_action_from_policy(compress_state(state))
-      apply_action(action)
-      last_action = action 
+      actions = {}
+      for tls in tls_ids:
+        actions[tls] = get_action_from_policy(compressed_state, tls)
+      apply_action(actions)
+      last_actions = actions 
       last_action_state = state
     
     traci.simulationStep()  # Advance simulation by one step
@@ -367,33 +404,38 @@ for episode in range(episodes):
     cumulative_reward += reward
     
     if step - action_step == 0:
-      update_Q_table(compress_state(last_action_state), last_action, (reward - get_reward(last_action_state))/5.0, compress_state(new_state))
-
+      for tls in tls_ids:
+          update_Q_table(tls,compress_state(last_action_state),last_actions[tls],(get_reward(last_action_state)-reward)/50.0,compress_state(new_state))
     if step % 20 == 0 and step > 0:
         if EPSILON > EPSILON_MIN:
            EPSILON *= EPSILON_DECAY
 
     if step % TARGET_UPDATE_FREQ == 0:
-       TAU = 0.002
-       for target_var, online_var in zip(target_model.variables, dqn_model.variables):
-           target_var.assign(TAU * online_var + (1 - TAU) * target_var)
+        TAU = 0.002
+        for tls in tls_ids:
+            for target_var, online_var in zip(target_models[tls].variables,dqn_models[tls].variables):
+                target_var.assign(TAU * online_var + (1-TAU) * target_var)
 
     # Record data every 100 steps
     if step % 100 == 0:
-        print(f"\nepsilon : {EPSILON}")
-        print(f"Step {step}, Current_State: {state}, Action: {action}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f}")
+        print(f"\nepsilon : {EPSILON} - MultiAgent_DQN_Queue.py:390")
+        print(f"Step {step}, Current_State: {state}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f} - MultiAgent_DQN_Queue.py:391")
         step_history.append(step)
         reward_history.append(cumulative_reward)
         queue_history.append(sum(new_state[:-NUM_TLS]))  # sum of queue lengths
+        current_min_ttc = get_network_min_ttc()
+        ttc_history.append(current_min_ttc)
     # -------------------------
     # Step 9: Close connection between SUMO and Traci
     # -------------------------
   traci.close()
 
 # ~~~ Print final model summary (replacing Q-table info) ~~~
-print("\nOnline Training completed.")
-print("DQN Model Summary:")
-dqn_model.summary()
+print("\nOnline Training completed. - MultiAgent_DQN_Queue.py:401")
+print("DQN Models Summary: - MultiAgent_DQN_Queue.py:402")
+for tls in tls_ids:
+    print("\nAgent: - MultiAgent_DQN_Queue.py:404",tls)
+    dqn_models[tls].summary()
 
 # -------------------------
 # Visualization of Results
@@ -404,7 +446,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, reward_history, marker='o', linestyle='-', label="Cumulative Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Queue Length Reward")
-plt.title("RL Training (DQN): Cumulative Queue Length Reward over Steps")
+if selected_demand == high :
+    plt.title("(high demand)RL Training (DQN): Cumulative Queue Length Reward over Steps")
+elif selected_demand == medium :
+    plt.title("(medium demand)RL Training (DQN): Cumulative Queue Length Reward over Steps")
+elif selected_demand == low :
+    plt.title("(low demand)RL Training (DQN): Cumulative Queue Length Reward over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -414,10 +461,35 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, queue_history, marker='o', linestyle='-', label="Total Queue Length")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Queue Length")
-plt.title("RL Training (DQN): Queue Length over Steps")
+if selected_demand == high :
+     plt.title("(high demand)RL Training (DQN): Queue Length over Steps")
+elif selected_demand == medium :
+     plt.title("(medium demand)RL Training (DQN): Queue Length over Steps")
+elif selected_demand == low :
+     plt.title("(low demand)RL Training (DQN): Queue Length over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+# Plot Minimum TTC over Simulation Steps
+plt.figure(figsize=(10, 6))
+plt.plot(step_history, ttc_history, marker='o', linestyle='-', color='red', label="Network Min TTC")
+plt.xlabel("Simulation Step")
+plt.ylabel("Minimum Time to Collision (Seconds)")
+plt.axhline(y=3.0, color='orange', linestyle='--', label='Critical Threshold (3s)') # Optional: Reference line for danger
+
+if selected_demand == high:
+    plt.title("(high demand) RL Safety: Min TTC over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand) RL Safety: Min TTC over Steps")
+elif selected_demand == low:
+    plt.title("(low demand) RL Safety: Min TTC over Steps")
+    
+plt.legend()
+plt.grid(True)
+plt.show()
+
 
 #save results plotted in csv file
 
@@ -427,4 +499,27 @@ data = pd.DataFrame({
     "cum_queue": reward_history
 })
 
-data.to_csv("combine graphs/MultiAgent_DQN_Queue_results.csv", index=False)
+if selected_demand == high :
+    data.to_csv("combine graphs/high_demand_MultiAgent_DQN_Queue_results.csv", index=False)
+elif selected_demand == medium :
+    data.to_csv("combine graphs/medium_demand_MultiAgent_DQN_Queue_results.csv", index=False)
+elif selected_demand == low :
+    data.to_csv("combine graphs/low_demand_MultiAgent_DQN_Queue_results.csv", index=False)
+
+
+# ==========================================
+# TTC Data Export 
+# ==========================================
+
+# Save TTC results in a separate CSV file
+ttc_data = pd.DataFrame({
+    "step": step_history,
+    "min_ttc": ttc_history
+})
+
+if selected_demand == high:
+    ttc_data.to_csv("combine graphs/high_demand_MultiAgent_DQN_Queue_TTC_results.csv", index=False)
+elif selected_demand == medium:
+    ttc_data.to_csv("combine graphs/medium_demand_MultiAgent_DQN_Queue_TTC_results.csv", index=False)
+elif selected_demand == low:
+    ttc_data.to_csv("combine graphs/low_demand_MultiAgent_DQN_Queue_TTC_results.csv", index=False)

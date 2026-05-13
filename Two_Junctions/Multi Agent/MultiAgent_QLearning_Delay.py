@@ -22,9 +22,16 @@ else:
 import traci
 
 # Step 4: Define Sumo configuration
+high = 0 
+medium = 1
+low = 2
+selected_demand = low
+rou_files = ["RL_high.rou.xml","RL_medium.rou.xml","RL_low.rou.xml"]
+selected_route = rou_files[selected_demand]
 Sumo_config = [
     'sumo-gui',
     '-c', 'RL.sumocfg',
+    '--route-files', selected_route,
     '--step-length', '0.10',
     '--delay', '1000',
     '--lateral-resolution', '0'
@@ -51,9 +58,9 @@ incoming_edges = list(set(traci.lane.getEdgeID(lane)
 
 tls_ids = list(traci.trafficlight.getIDList())
 
-print("TLS IDs: ", tls_ids) #to depug
-print("incoming_edges: ",incoming_edges) #to depug
-print("all_detectors: ",all_detectors) #to depug
+print("TLS IDs: - MultiAgent_QLearning_Delay.py:61", tls_ids) #to depug
+print("incoming_edges: - MultiAgent_QLearning_Delay.py:62",incoming_edges) #to depug
+print("all_detectors: - MultiAgent_QLearning_Delay.py:63",all_detectors) #to depug
 
 # RL Hyperparameters
 TOTAL_STEPS = 10000
@@ -92,7 +99,7 @@ edge_detectors = {edge:[] for edge in edge_list}
 for det,edge in detector_edge_map.items():
     edge_detectors[edge].append(det)
 
-print("Edge groups:", edge_detectors)
+print("Edge groups: - MultiAgent_QLearning_Delay.py:102", edge_detectors)
 
 # -------------------------
 # Step 7: Define Functions
@@ -128,11 +135,11 @@ def inject_breakdown(lane_id,edge_id, duration=100):
             duration=duration
         )
 
-        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps.")
+        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps. - MultiAgent_QLearning_Delay.py:138")
         stopping_car = veh_id
 
     except traci.TraCIException:
-        print("not found")
+        print("not found - MultiAgent_QLearning_Delay.py:142")
         pass  # Ignore errors if vehicle disappears
 
 def get_max_Q_value_of_state(state,tls):
@@ -231,6 +238,34 @@ def get_queue_length(detector_id): #8.Constraint 8
 
 def get_current_phase(tls_id): #8.Constraint 8
     return traci.trafficlight.getPhase(tls_id)
+
+def get_network_min_ttc(safe_threshold=50.0):
+    """
+    Calculates the minimum Time To Collision (TTC) across all vehicles currently in the network.
+    Returns safe_threshold if no vehicles are on a collision course.
+    """
+    min_ttc = safe_threshold
+    vehicles = traci.vehicle.getIDList()
+    
+    for veh_id in vehicles:
+        # getLeader returns a tuple (leader_id, distance) or None
+        leader_info = traci.vehicle.getLeader(veh_id, 0.0) 
+        
+        if leader_info is not None:
+            leader_id, distance = leader_info
+            v_follower = traci.vehicle.getSpeed(veh_id)
+            v_leader = traci.vehicle.getSpeed(leader_id)
+            
+            # TTC is only valid if the follower is faster than the leader
+            if v_follower > v_leader:
+                relative_speed = v_follower - v_leader
+                # Prevent division by zero just in case
+                if relative_speed > 0: 
+                    ttc = distance / relative_speed
+                    if ttc < min_ttc:
+                        min_ttc = ttc
+                        
+    return min_ttc
 # -------------------------
 # Step 8: Fully Online Continuous Learning Loop
 # -------------------------
@@ -239,11 +274,12 @@ step_history=[]
 reward_history=[]
 queue_history=[]
 delay_history=[]
+ttc_history = []
 
 cumulative_reward = 0.0
 
-print("\n=== Starting Fully Online Continuous Learning ===")
-print("\n=== Starting Fully Online Continuous Learning ===")
+print("\n=== Starting Fully Online Continuous Learning === - MultiAgent_QLearning_Delay.py:252")
+print("\n=== Starting Fully Online Continuous Learning === - MultiAgent_QLearning_Delay.py:253")
 episodes = 1
 for episode in range(episodes):
   if episode !=0:
@@ -264,6 +300,7 @@ for episode in range(episodes):
   reward_history=[]
   queue_history=[]
   delay_history=[]
+  ttc_history = []
 
   cumulative_reward = 0.0
   EPSILON = 1.0 - episode/episodes
@@ -309,11 +346,13 @@ for episode in range(episodes):
         reward_history.append(cumulative_reward)
         queue_history.append(sum(new_state[:-len(tls_ids)]))
         delay_history.append(-reward)
-        print(f"\nstate:{state}")
-        print(f"epsilon :{EPSILON}")
-        print(f"Step {step}, Current_State: {state}, Action: {actions}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f}")
+        current_min_ttc = get_network_min_ttc()
+        ttc_history.append(current_min_ttc)
+        print(f"\nstate:{state} - MultiAgent_QLearning_Delay.py:319")
+        print(f"epsilon :{EPSILON} - MultiAgent_QLearning_Delay.py:320")
+        print(f"Step {step}, Current_State: {state}, Action: {actions}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f} - MultiAgent_QLearning_Delay.py:321")
         for tls in tls_ids:
-           print(f"TLS {tls} Q-table size: {len(Q_tables[tls])}")
+           print(f"TLS {tls} Qtable size: {len(Q_tables[tls])} - MultiAgent_QLearning_Delay.py:323")
  # -------------------------
  # Step 9: Close connection between SUMO and Traci
  # -------------------------
@@ -328,7 +367,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, reward_history, marker='o', linestyle='-', label="Cumulative Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Reward")
-plt.title("RL Training: Cumulative delay Reward over Steps")
+if selected_demand == high :
+    plt.title("(high demand)RL Training: Cumulative delay Reward over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand)RL Training: Cumulative delay Reward over Steps")
+elif selected_demand == low :
+    plt.title("(low demand)RL Training: Cumulative delay Reward over Steps")
 plt.legend()
 plt.grid(True) 
 plt.show()
@@ -338,7 +382,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, queue_history, marker='o', linestyle='-', label="Total Queue Length")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Queue Length")
-plt.title("RL Training: Queue Length over Steps")
+if selected_demand == high :
+      plt.title("(high demand)RL Training: Queue Length over Steps")
+elif selected_demand == medium :
+      plt.title("(medium demand)RL Training: Queue Length over Steps")
+elif selected_demand == low :
+      plt.title("(low demand)RL Training: Queue Length over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -348,10 +397,35 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, delay_history, marker='o', linestyle='-', label="Total Delay")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Delay (seconds)")
-plt.title("RL Training: Total Delay over Steps")
+if selected_demand == high :
+       plt.title("(high demand)RL Training: Total Delay over Steps")
+elif selected_demand == medium :
+       plt.title("(medium demand)RL Training: Total Delay over Steps") 
+elif selected_demand == low :
+       plt.title("(low demand)RL Training: Total Delay over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
+
+
+# Plot Minimum TTC over Simulation Steps
+plt.figure(figsize=(10, 6))
+plt.plot(step_history, ttc_history, marker='o', linestyle='-', color='red', label="Network Min TTC")
+plt.xlabel("Simulation Step")
+plt.ylabel("Minimum Time to Collision (Seconds)")
+plt.axhline(y=3.0, color='orange', linestyle='--', label='Critical Threshold (3s)') # Optional: Reference line for danger
+
+if selected_demand == high:
+    plt.title("(high demand) RL Safety: Min TTC over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand) RL Safety: Min TTC over Steps")
+elif selected_demand == low:
+    plt.title("(low demand) RL Safety: Min TTC over Steps")
+    
+plt.legend()
+plt.grid(True)
+plt.show()
+
 
 
 # Save results
@@ -362,5 +436,27 @@ data = pd.DataFrame({
     "delay":delay_history,
     "cum_delay":reward_history
 })
+if selected_demand == high :
+    data.to_csv("combine graphs/high_demand_MultiAgent_QLearning_Delay_results.csv",index=False)
+elif selected_demand == medium :
+    data.to_csv("combine graphs/medium_demand_MultiAgent_QLearning_Delay_results.csv",index=False)
+elif selected_demand == low :
+    data.to_csv("combine graphs/low_demand_MultiAgent_QLearning_Delay_results.csv",index=False)
 
-data.to_csv("combine graphs/MultiAgent_QLearning_Delay_results.csv",index=False)
+
+# ==========================================
+# TTC Data Export 
+# ==========================================
+
+# Save TTC results in a separate CSV file
+ttc_data = pd.DataFrame({
+    "step": step_history,
+    "min_ttc": ttc_history
+})
+
+if selected_demand == high:
+    ttc_data.to_csv("combine graphs/high_demand_MultiAgent_QLearning_Delay_TTC_results.csv", index=False)
+elif selected_demand == medium:
+    ttc_data.to_csv("combine graphs/medium_demand_MultiAgent_QLearning_Delay_TTC_results.csv", index=False)
+elif selected_demand == low:
+    ttc_data.to_csv("combine graphs/low_demand_MultiAgent_QLearning_Delay_TTC_results.csv", index=False)

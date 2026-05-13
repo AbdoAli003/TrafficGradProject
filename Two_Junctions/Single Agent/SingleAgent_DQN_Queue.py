@@ -27,9 +27,16 @@ else:
 import traci  # Static network information (such as reading and analyzing network files)
 
 # Step 4: Define Sumo configuration
+high = 0 
+medium = 1
+low = 2
+selected_demand = low
+rou_files = ["RL_high.rou.xml","RL_medium.rou.xml","RL_low.rou.xml"]
+selected_route = rou_files[selected_demand]
 Sumo_config = [
     'sumo',   # <-- change from 'sumo' to 'sumo-gui'
     '-c', 'RL.sumocfg',
+    '--route-files', selected_route,
     '--step-length', '0.10',
     '--delay', '0',
     '--lateral-resolution', '0'
@@ -57,9 +64,9 @@ incoming_edges = list(set(
     if not traci.lane.getEdgeID(lane).startswith(":")
 ))
 tls_ids = list(traci.trafficlight.getIDList())
-print("TLS IDs: ", tls_ids) #to depug
-print("incoming_edges: ",incoming_edges) #to depug
-print("detectors_IDS: ",all_detectors) #to depug
+print("TLS IDs: - SingleAgent_DQN_Queue.py:67", tls_ids) #to depug
+print("incoming_edges: - SingleAgent_DQN_Queue.py:68",incoming_edges) #to depug
+print("detectors_IDS: - SingleAgent_DQN_Queue.py:69",all_detectors) #to depug
 
 # ---- Reinforcement Learning Hyperparameters ----
 TOTAL_STEPS = 10000    # The total number of simulation steps for continuous (online) training.
@@ -104,7 +111,7 @@ edge_detectors = {edge: [] for edge in edge_list}
 for det, edge in detector_edge_map.items():
     edge_detectors[edge].append(det)
 
-print("Edge groups:", edge_detectors)
+print("Edge groups: - SingleAgent_DQN_Queue.py:114", edge_detectors)
 # -------------------------
 # Step 7: Define Functions
 # -------------------------
@@ -140,11 +147,11 @@ def inject_breakdown(lane_id,edge_id, duration=100):
             duration=duration
         )
 
-        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps.")
+        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps. - SingleAgent_DQN_Queue.py:150")
         stopping_car = veh_id
 
     except traci.TraCIException:
-        print("not found")
+        print("not found - SingleAgent_DQN_Queue.py:154")
         pass  # Ignore errors if vehicle disappears
 
 def build_model(state_size, action_size):
@@ -322,6 +329,36 @@ def get_queue_length(detector_id): #8.Constraint 8
 def get_current_phase(tls_id): #8.Constraint 8
     return traci.trafficlight.getPhase(tls_id)
 
+
+def get_network_min_ttc(safe_threshold=50.0):
+    """
+    Calculates the minimum Time To Collision (TTC) across all vehicles currently in the network.
+    Returns safe_threshold if no vehicles are on a collision course.
+    """
+    min_ttc = safe_threshold
+    vehicles = traci.vehicle.getIDList()
+    
+    for veh_id in vehicles:
+        # getLeader returns a tuple (leader_id, distance) or None
+        leader_info = traci.vehicle.getLeader(veh_id, 0.0) 
+        
+        if leader_info is not None:
+            leader_id, distance = leader_info
+            v_follower = traci.vehicle.getSpeed(veh_id)
+            v_leader = traci.vehicle.getSpeed(leader_id)
+            
+            # TTC is only valid if the follower is faster than the leader
+            if v_follower > v_leader:
+                relative_speed = v_follower - v_leader
+                # Prevent division by zero just in case
+                if relative_speed > 0: 
+                    ttc = distance / relative_speed
+                    if ttc < min_ttc:
+                        min_ttc = ttc
+                        
+    return min_ttc
+
+
 # -------------------------
 # Step 8: Fully Online Continuous Learning Loop
 # -------------------------
@@ -330,10 +367,11 @@ def get_current_phase(tls_id): #8.Constraint 8
 step_history = []
 reward_history = []
 queue_history = []
+ttc_history = []
 
 cumulative_reward = 0.0
 
-print("\n=== Starting Fully Online Continuous Learning (DQN) ===")
+print("\n=== Starting Fully Online Continuous Learning (DQN) === - SingleAgent_DQN_Queue.py:343")
 episodes = 1
 for episode in range(episodes):
   if episode !=0:
@@ -341,6 +379,7 @@ for episode in range(episodes):
   step_history = []
   reward_history = []
   queue_history = []
+  ttc_history = []
   cumulative_reward = 0.0
 
   action_step = 0
@@ -380,19 +419,21 @@ for episode in range(episodes):
 
     # Record data every 100 steps
     if step % 100 == 0:
-        print(f"\nepsilon : {EPSILON}")
-        print(f"Step {step}, Current_State: {state}, Action: {action}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f}")
+        print(f"\nepsilon : {EPSILON} - SingleAgent_DQN_Queue.py:390")
+        print(f"Step {step}, Current_State: {state}, Action: {action}, New_State: {new_state}, Reward: {reward:.2f}, Cumulative Reward: {cumulative_reward:.2f} - SingleAgent_DQN_Queue.py:391")
         step_history.append(step)
         reward_history.append(cumulative_reward)
         queue_history.append(sum(new_state[:-NUM_TLS]))  # sum of queue lengths
+        current_min_ttc = get_network_min_ttc()
+        ttc_history.append(current_min_ttc)
     # -------------------------
     # Step 9: Close connection between SUMO and Traci
     # -------------------------
   traci.close()
 
 # ~~~ Print final model summary (replacing Q-table info) ~~~
-print("\nOnline Training completed.")
-print("DQN Model Summary:")
+print("\nOnline Training completed. - SingleAgent_DQN_Queue.py:401")
+print("DQN Model Summary: - SingleAgent_DQN_Queue.py:402")
 dqn_model.summary()
 
 # -------------------------
@@ -404,7 +445,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, reward_history, marker='o', linestyle='-', label="Cumulative Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Queue Length Reward")
-plt.title("RL Training (DQN): Cumulative Queue Length Reward over Steps")
+if selected_demand == high :
+    plt.title("(high demand)RL Training (DQN): Cumulative Queue Length Reward over Steps")
+elif selected_demand == medium :
+    plt.title("(medium demand)RL Training (DQN): Cumulative Queue Length Reward over Steps")
+elif selected_demand == low :
+    plt.title("(low demand)RL Training (DQN): Cumulative Queue Length Reward over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -414,7 +460,30 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, queue_history, marker='o', linestyle='-', label="Total Queue Length")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Queue Length")
-plt.title("RL Training (DQN): Queue Length over Steps")
+if selected_demand == high :
+    plt.title("(high demand)RL Training (DQN): Queue Length over Steps")
+elif selected_demand == medium :
+    plt.title("(medium demand)RL Training (DQN): Queue Length over Steps")
+elif selected_demand == low :
+    plt.title("(low demand)RL Training (DQN): Queue Length over Steps")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+# Plot Minimum TTC over Simulation Steps
+plt.figure(figsize=(10, 6))
+plt.plot(step_history, ttc_history, marker='o', linestyle='-', color='red', label="Network Min TTC")
+plt.xlabel("Simulation Step")
+plt.ylabel("Minimum Time to Collision (Seconds)")
+plt.axhline(y=3.0, color='orange', linestyle='--', label='Critical Threshold (3s)') # Optional: Reference line for danger
+
+if selected_demand == high:
+    plt.title("(high demand) RL Safety: Min TTC over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand) RL Safety: Min TTC over Steps")
+elif selected_demand == low:
+    plt.title("(low demand) RL Safety: Min TTC over Steps")
+    
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -426,5 +495,27 @@ data = pd.DataFrame({
     "queue": queue_history,
     "cum_queue": reward_history
 })
+if selected_demand == high :
+     data.to_csv("combine graphs/high_demand_SingleAgent_DQN_Queue_results.csv", index=False)
+elif selected_demand == medium :
+     data.to_csv("combine graphs/medium_demand_SingleAgent_DQN_Queue_results.csv", index=False)
+elif selected_demand == low :
+     data.to_csv("combine graphs/low_demand_SingleAgent_DQN_Queue_results.csv", index=False)
 
-data.to_csv("combine graphs/SingleAgent_DQN_Queue_results.csv", index=False)
+
+# ==========================================
+# TTC Data Export 
+# ==========================================
+
+# Save TTC results in a separate CSV file
+ttc_data = pd.DataFrame({
+    "step": step_history,
+    "min_ttc": ttc_history
+})
+
+if selected_demand == high:
+    ttc_data.to_csv("combine graphs/high_demand_SingleAgent_DQN_Queue_TTC_results.csv", index=False)
+elif selected_demand == medium:
+    ttc_data.to_csv("combine graphs/medium_demand_SingleAgent_DQN_Queue_TTC_results.csv", index=False)
+elif selected_demand == low:
+    ttc_data.to_csv("combine graphs/low_demand_SingleAgent_DQN_Queue_TTC_results.csv", index=False)

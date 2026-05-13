@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<!-- generated on 2026-04-02T20:17:31.499491+02:00 by Eclipse SUMO netedit 1.25.0
+<neteditConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/neteditConfiguration.xsd">
+
+    <input>
+        <sumocfg-file value="C:\Users\abdoa\Downloads\25_Jan\25_Jan.sumocfg"/>
+        <route-files value="C:\Users\abdoa\Downloads\25_Jan\25_Jan.rou.xml"/>
+        <sumo-net-file value="C:\Users\abdoa\Downloads\25_Jan\25_Jan.net.xml"/>
+    </input>
+
+    <processing>
+        <geometry.min-radius.fix.railways value="false"/>
+        <geometry.avoid-overlap value="false"/>
+        <geometry.max-grade.fix value="false"/>
+        <offset.disable-normalization value="true"/>
+        <lefthand value="0"/>
+    </processing>
+
+    <junctions>
+        <no-turnarounds value="true"/>
+        <junctions.corner-detail value="5"/>
+        <junctions.limit-turn-speed value="5.50"/>
+        <rectangular-lane-cut value="0"/>
+    </junctions>
+
+    <pedestrian>
+        <walkingareas value="0"/>
+    </pedestrian>
+
+</neteditConfiguration>
+-->
+
+<additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
+    <tlLogic id="clusterJ15_J27_J28_J31_#1more" type="static" programID="0" offset="0">
+        <phase duration="40" state="GGrrGGGGGG"/>
+        <phase duration="3"  state="yyrryyyyyy"/>
+        <phase duration="20" state="GGGGGGGGrr"/>
+        <phase duration="3"  state="yyyyyyyyrr"/>
+        <phase duration="20" state="rrrrGGGGGG"/>
+        <phase duration="3"  state="rrrryyyyyy"/>
+    </tlLogic>
+</additional>

@@ -21,9 +21,16 @@ else:
 import traci  # Static network information (such as reading and analyzing network files)
 
 # Step 4: Define Sumo configuration
+high = 0 
+medium = 1
+low = 2
+selected_demand = low
+rou_files = ["RL_high.rou.xml","RL_medium.rou.xml","RL_low.rou.xml"]
+selected_route = rou_files[selected_demand]
 Sumo_config = [
     'sumo-gui',
     '-c', 'RL.sumocfg',
+    '--route-files', selected_route,
     '--step-length', '0.10',
     '--delay', '1000',
     '--lateral-resolution', '0'
@@ -50,9 +57,9 @@ incoming_edges = list(set(
     if not traci.lane.getEdgeID(lane).startswith(":")
 ))
 tls_ids = list(traci.trafficlight.getIDList())
-print("TLS IDs:", tls_ids) #to depug
-print("incoming_edges :",incoming_edges) #to depug
-print("detectors IDS :",all_detectors) #to depug
+print("TLS IDs: - Baseline_Fixed_Time.py:60", tls_ids) #to depug
+print("incoming_edges : - Baseline_Fixed_Time.py:61",incoming_edges) #to depug
+print("detectors IDS : - Baseline_Fixed_Time.py:62",all_detectors) #to depug
 # ---- Reinforcement Learning Hyperparameters ----
 TOTAL_STEPS = 10000
 
@@ -92,11 +99,11 @@ def inject_breakdown(lane_id,edge_id, duration=100):
             duration=duration
         )
 
-        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps.")
+        print(f"Breakdown injected on vehicle {veh_id} at edge {edge_id} and lane {lane_id} for {duration} steps. - Baseline_Fixed_Time.py:102")
         stopping_car = veh_id
 
     except traci.TraCIException:
-        print("not found")
+        print("not found - Baseline_Fixed_Time.py:106")
         pass  # Ignore errors if vehicle disappears
 
 def get_state():
@@ -123,6 +130,36 @@ def get_queue_length(detector_id):
 def get_current_phase(tls_id):
     return traci.trafficlight.getPhase(tls_id)
 
+
+def get_network_min_ttc(safe_threshold=50.0):
+    """
+    Calculates the minimum Time To Collision (TTC) across all vehicles currently in the network.
+    Returns safe_threshold if no vehicles are on a collision course.
+    """
+    min_ttc = safe_threshold
+    vehicles = traci.vehicle.getIDList()
+    
+    for veh_id in vehicles:
+        # getLeader returns a tuple (leader_id, distance) or None
+        leader_info = traci.vehicle.getLeader(veh_id, 0.0) 
+        
+        if leader_info is not None:
+            leader_id, distance = leader_info
+            v_follower = traci.vehicle.getSpeed(veh_id)
+            v_leader = traci.vehicle.getSpeed(leader_id)
+            
+            # TTC is only valid if the follower is faster than the leader
+            if v_follower > v_leader:
+                relative_speed = v_follower - v_leader
+                # Prevent division by zero just in case
+                if relative_speed > 0: 
+                    ttc = distance / relative_speed
+                    if ttc < min_ttc:
+                        min_ttc = ttc
+                        
+    return min_ttc
+
+
 # -------------------------
 # Step 8: Fully Online Continuous Learning Loop
 # -------------------------
@@ -132,11 +169,12 @@ queue_history = []
 delay_history = []
 cumulative_queue_history = []
 cumulative_delay_history = []
+ttc_history = []
 cumulative_reward = 0.0
 cumulative_queue_reward = 0.0
 cumulative_delay_reward = 0.0
 
-print("\n=== Starting Fully Online Continuous Learning ===")
+print("\n=== Starting Fully Online Continuous Learning === - Baseline_Fixed_Time.py:146")
 for step in range(TOTAL_STEPS):
     current_simulation_step = step
     traci.simulationStep()
@@ -161,8 +199,10 @@ for step in range(TOTAL_STEPS):
         delay_history.append(total_delay)
         cumulative_queue_history.append(cumulative_queue_reward)
         cumulative_delay_history.append(cumulative_delay_reward)
+        current_min_ttc = get_network_min_ttc()
+        ttc_history.append(current_min_ttc)
 
-        print(f"Step {step}, Total Queue: {total_queue}, Total Delay: {total_delay}, "
+        print(f"Step {step}, Total Queue: {total_queue}, Total Delay: {total_delay}, - Baseline_Fixed_Time.py:172"
               f"Cumulative Queue Reward: {cumulative_queue_reward}, "
               f"Cumulative Delay Reward: {cumulative_delay_reward}")
 
@@ -180,7 +220,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, cumulative_queue_history, marker='o', linestyle='-', label="Cumulative Queue Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Queue Reward")
-plt.title("Fixed Timing: Cumulative Queue Reward over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Cumulative Queue Reward over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand)Fixed Timing: Cumulative Queue Reward over Steps")
+elif selected_demand == low:
+    plt.title("(low demand)Fixed Timing: Cumulative Queue Reward over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -190,7 +235,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, cumulative_delay_history, marker='o', linestyle='-', label="Cumulative Delay Reward")
 plt.xlabel("Simulation Step")
 plt.ylabel("Cumulative Delay Reward")
-plt.title("Fixed Timing: Cumulative Delay Reward over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Cumulative Delay Reward over Steps")
+elif selected_demand == medium:
+   plt.title("(medium demand)Fixed Timing: Cumulative Delay Reward over Steps")
+elif selected_demand == low:
+       plt.title("(low demand)Fixed Timing: Cumulative Delay Reward over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -200,7 +250,12 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, queue_history, marker='o', linestyle='-', label="Total Queue Length")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Queue Length")
-plt.title("Fixed Timing: Queue Length over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Queue Length over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand)Fixed Timing: Queue Length over Steps")
+elif selected_demand == low:
+    plt.title("(low demand)Fixed Timing: Queue Length over Steps")
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -210,7 +265,31 @@ plt.figure(figsize=(10, 6))
 plt.plot(step_history, delay_history, marker='o', linestyle='-', label="Total Vehicle Delay")
 plt.xlabel("Simulation Step")
 plt.ylabel("Total Delay (seconds)")
-plt.title("Fixed Timing: Total Vehicle Delay over Steps")
+if selected_demand == high:
+   plt.title("(high demand)Fixed Timing: Total Vehicle Delay over Steps")
+elif selected_demand == medium:
+   plt.title("(medium demand)Fixed Timing: Total Vehicle Delay over Steps") 
+elif selected_demand == low:
+   plt.title("(low demand)Fixed Timing: Total Vehicle Delay over Steps")
+plt.legend()
+plt.grid(True)
+plt.show()
+
+
+# Plot Minimum TTC over Simulation Steps
+plt.figure(figsize=(10, 6))
+plt.plot(step_history, ttc_history, marker='o', linestyle='-', color='red', label="Network Min TTC")
+plt.xlabel("Simulation Step")
+plt.ylabel("Minimum Time to Collision (Seconds)")
+plt.axhline(y=3.0, color='orange', linestyle='--', label='Critical Threshold (3s)') # Optional: Reference line for danger
+
+if selected_demand == high:
+    plt.title("(high demand) RL Safety: Min TTC over Steps")
+elif selected_demand == medium:
+    plt.title("(medium demand) RL Safety: Min TTC over Steps")
+elif selected_demand == low:
+    plt.title("(low demand) RL Safety: Min TTC over Steps")
+    
 plt.legend()
 plt.grid(True)
 plt.show()
@@ -225,4 +304,28 @@ data = pd.DataFrame({
     "cum_delay": cumulative_delay_history
 })
 
-data.to_csv("combine graphs/Baseline_Fixed_result.csv", index=False)
+if selected_demand == high :
+     data.to_csv("combine graphs/high_demand_Baseline_Fixed_result.csv", index=False)
+elif selected_demand == medium :
+     data.to_csv("combine graphs/medium_demand_Baseline_Fixed_result.csv", index=False)
+elif selected_demand == low:
+     data.to_csv("combine graphs/low_demand_Baseline_Fixed_result.csv", index=False)
+
+
+
+# ==========================================
+# TTC Data Export 
+# ==========================================
+
+# Save TTC results in a separate CSV file
+ttc_data = pd.DataFrame({
+    "step": step_history,
+    "min_ttc": ttc_history
+})
+
+if selected_demand == high:
+    ttc_data.to_csv("combine graphs/high_demand_Baseline_Fixed_TTC_results.csv", index=False)
+elif selected_demand == medium:
+    ttc_data.to_csv("combine graphs/medium_demand_Baseline_Fixed_TTC_results.csv", index=False)
+elif selected_demand == low:
+    ttc_data.to_csv("combine graphs/low_demand_Baseline_Fixed_TTC_results.csv", index=False)
