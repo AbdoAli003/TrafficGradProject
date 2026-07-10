@@ -8,3 +8,4 @@ NGSIM_PeachTree/extract_data.py
 NGSIM_PeachTree/yolov8n.pt
 
 NGSIM_PeachTree/*.yaml
+NGSIM_PeachTree/*.avi
