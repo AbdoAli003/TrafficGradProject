@@ -35,7 +35,7 @@ fps = int(cap.get(cv2.CAP_PROP_FPS))
 # Define the codec and create VideoWriter object
 output_path = "output_tracked.avi"
 fourcc = cv2.VideoWriter_fourcc(*"MJPG")
-out = cv2.VideoWriter(output_path, fourcc, fps * 2, (frame_width, frame_height))
+out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
 # ---------------------------------------------
 
 print("Starting Stable ByteTrack Car Detection... Press 'q' to quit.")
@@ -56,7 +56,6 @@ while cap.isOpened():
         persist=True,
         tracker="bytetrack.yaml",
         conf=0.50,
-        imgsz=640,
         verbose=False,
     )
 
