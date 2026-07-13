@@ -36,9 +36,15 @@ fps = int(cap.get(cv2.CAP_PROP_FPS))
 output_path = "output_tracked.avi"
 fourcc = cv2.VideoWriter_fourcc(*"MJPG")
 out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
-# ---------------------------------------------
 
-print("Starting Stable ByteTrack Car Detection... Press 'q' to quit.")
+# --- UI CONFIGURATIONS ---
+BOX_COLOR = (200, 255, 0)     # High-visibility Cyan-Green
+TEXT_COLOR = (0, 0, 0)        # Black text for maximum contrast
+HUD_BG_COLOR = (20, 20, 20)   # Dark gray/black for the top counter
+HUD_TEXT_COLOR = (255, 255, 255) # White text for the counter
+# -------------------------
+
+print("Starting Upgraded ByteTrack Car Detection... Press 'q' to quit.")
 print(f"Saving output to: {output_path}")
 
 # 4. Process the video frame by frame
@@ -50,20 +56,21 @@ while cap.isOpened():
 
     annotated_frame = frame.copy()
 
-    # 5. Run tracking logic with Class [0] only
+    # Run tracking logic
     results = model.track(
         frame,
         persist=True,
         tracker="bytetrack.yaml",
-        conf=0.50,
+        conf=0.60,
         verbose=False,
     )
 
-    # 6. Corrected Drawing Logic: Execute if boxes exist, even without IDs
+    current_car_count = 0
+
     if results[0].boxes is not None and len(results[0].boxes) > 0:
         boxes = results[0].boxes.xyxy.cpu().numpy()
+        current_car_count = len(boxes)  # Count vehicles in current frame
 
-        # Safely extract IDs, falling back to None if the tracker hasn't assigned them yet
         if results[0].boxes.id is not None:
             track_ids = results[0].boxes.id.cpu().numpy().astype(int)
         else:
@@ -73,32 +80,37 @@ while cap.isOpened():
             x1, y1, x2, y2 = map(int, box)
             track_id = track_ids[i]
 
-            # Ground contact point
-            cx, cy = (x1 + x2) // 2, y2
+            # 1. Draw the main bounding box
+            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), BOX_COLOR, 2)
 
-            # Always draw the detection box in green
-            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            # 2. Create a dynamic solid background for the ID text
+            label = f"ID: {track_id}" if track_id is not None else "..."
+            (text_width, text_height), _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.5, 2)
+            
+            # Draw the filled rectangle behind the text
+            cv2.rectangle(annotated_frame, (x1, y1 - text_height - 10), (x1 + text_width + 4, y1), BOX_COLOR, -1)
+            
+            # Draw the text over the filled rectangle
+            cv2.putText(annotated_frame, label, (x1 + 2, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, TEXT_COLOR, 2)
 
-            label = f"ID: {track_id}" if track_id is not None else "Detecting..."
-            cv2.putText(
-                annotated_frame,
-                label,
-                (x1, y1 - 10),
-                cv2.FONT_HERSHEY_SIMPLEX,
-                0.5,
-                (0, 255, 0),
-                2,
-            )
+    # --- DRAW THE LIVE CAR COUNTER HUD (ULTRA-MINI SCALE) ---
+    counter_text = f"Vehicles: {current_car_count}"
+    cv2.rectangle(annotated_frame, (10, 10), (105, 34), HUD_BG_COLOR, -1)
+    cv2.rectangle(annotated_frame, (10, 10), (105, 34), BOX_COLOR, 1)
+    cv2.putText(annotated_frame, counter_text, (16, 26), cv2.FONT_HERSHEY_DUPLEX, 0.4, HUD_TEXT_COLOR, 1)
+    # --------------------------------------------------------
 
-    # 7. Write the annotated frame to the output video file (this was missing!)
+    # Write the annotated frame
     out.write(annotated_frame)
 
-    # 8. Display the video
+    # Display the video
     cv2.imshow("ByteTrack Car Tracking", annotated_frame)
-    if cv2.waitKey(1) & 0xFF == ord("q"):
+    
+    if cv2.waitKey(10) & 0xFF == ord("q"):
+        print("Quitting manually...")
         break
 
-# Cleanup
 cap.release()
 out.release()
 cv2.destroyAllWindows()
+print("Video successfully saved.")
