@@ -48,11 +48,12 @@ HUD_TEXT_COLOR = (255, 255, 255) # White text for the counter
 print("Starting Upgraded ByteTrack Car Detection... Press 'q' to quit. - main.py:48")
 print(f"Saving output to: {output_path} - main.py:49")
 
+# Points are specific for each camera
 image_points = np.float32([
-    [347,84],
-    [348,265],
-    [142,265],
-    [144,106]
+    [347,84],    # Top Right
+    [348,265],    # Bottom Right
+    [142,265],    # Bottom Left
+    [144,106]    # Top Left
 ])
 
 world_points = np.float32([
