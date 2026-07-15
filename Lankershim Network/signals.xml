@@ -31,15 +31,23 @@
 </neteditConfiguration>
 -->
 
-<additional xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/additional_file.xsd">
-    <tlLogic id="cluster13505819548_13505819549" type="static" programID="0" offset="0">
-        <phase duration="55" state="GGGrrrrrrrrrrrrrrrrGGGG"/>
-        <phase duration="4"  state="yyyrrrrrrrrrrrrrrrrGyyy"/>
-        <phase duration="20" state="rrrrrrrrrrrrrGGGGGGGrrr"/>
-        <phase duration="4"  state="rrrrrrrrrrrrryyyyyyyrrr"/>
-        <phase duration="30" state="GGGGGGGGGrrrrrrrrrrrrrr"/>
-        <phase duration="3"  state="yyyyyyyyGrrrrrrrrrrrrrr"/>
-        <phase duration="15" state="rrrrrrrrGGGGGGrrrrrrrrr"/>
-        <phase duration="4"  state="rrrrrrrryyyyyyrrrrrrrrr"/>
-    </tlLogic>
-</additional>
+<tlLogic id="clusterJ11_J15_J17_J20_#3more" type="static" programID="0" offset="0">
+    <!-- Phase 1: Lankershim through+right (N-S) + WB right -->
+    <phase duration="50" state="GrrrrrGGGGGrrrrGGGGrGr"/>
+    <!-- Phase 1 yellow -->
+    <phase duration="4"  state="yrrrrryyyyyrrrryyyyryr"/>
+    <!-- All‑red -->
+    <phase duration="2"  state="rrrrrrrrrrrrrrrrrrrrrr"/>
+    <!-- Phase 2: Lankershim lefts + EB right -->
+    <phase duration="12" state="rrrGrGrrrrrGrrrrrrrGrG"/>
+    <!-- Phase 2 yellow -->
+    <phase duration="3"  state="rrryryrrrrryrrrrrrryry"/>
+    <!-- All‑red -->
+    <phase duration="2"  state="rrrrrrrrrrrrrrrrrrrrrr"/>
+    <!-- Phase 3: Universal Hollywood through+right (E-W) -->
+    <phase duration="22" state="GGGrGrrrrrGGGGrrrrrrrr"/>
+    <!-- Phase 3 yellow -->
+    <phase duration="3"  state="yyyryrrrrryyyyrrrrrrrr"/>
+    <!-- All‑red -->
+    <phase duration="2"  state="rrrrrrrrrrrrrrrrrrrrrr"/>
+</tlLogic>

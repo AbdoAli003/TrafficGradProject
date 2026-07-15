@@ -1,25 +1,17 @@
 <?xml version="1.0" encoding="UTF-8"?>
 
-<!-- generated on 2026-07-14T23:19:30.569519+02:00 by Eclipse SUMO sumo 1.25.0
+<!-- generated on 2026-07-15T22:05:19.188493+02:00 by Eclipse SUMO sumo 1.25.0
 -->
 
 <sumoConfiguration xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:noNamespaceSchemaLocation="http://sumo.dlr.de/xsd/sumoConfiguration.xsd">
 
-    <configuration>
-        <configuration-file value=""/>
-    </configuration>
-
     <input>
         <net-file value="lankershim.net.xml"/>
-        <route-files value="video_demand.rou.xml"/>
+        <route-files value="extracted_demand.rou.xml"/>
     </input>
 
     <time>
         <step-length value="0.1"/>
     </time>
-
-    <gui_only>
-        <edgedata-files value=""/>
-    </gui_only>
 
 </sumoConfiguration>
