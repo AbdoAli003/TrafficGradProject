@@ -178,7 +178,7 @@ while cap.isOpened():
             # Position: 5 pixels above bounding box (tighter gap)
             label_y = max(y1 - 5, 20)
 
-            # Draw Background Box (Tighter padding: -3/+3 instead of -5/+5)
+            # Draw Background Box 
             cv2.rectangle(
                 annotated_frame,
                 (x1, label_y - th - 3),
@@ -200,7 +200,7 @@ while cap.isOpened():
 
     cv2.imshow("Demand Extraction & Queue Detection", annotated_frame)
 
-    # We use 1ms here because we WANT it to run as fast as possible to process the video quickly
+    # 1ms here because to run as fast as possible to process the video quickly
     if cv2.waitKey(1) & 0xFF == ord("q"):
         print("\nUser interrupted. Generating file with collected data...")
         break
@@ -235,7 +235,7 @@ with open(output_file, "w") as f:
             from_edge = AREA_TO_EDGE[data["entry_area"]][0]
             to_edge = AREA_TO_EDGE[data["exit_area"]][1]
 
-            # --- FILTER: Only write the trip if the physical connection exists ---
+            # Only write the trip if the physical connection exists ---
             if to_edge in VALID_ROUTES.get(from_edge, []):
                 # Use <trip> instead of <vehicle> to allow dynamic routing
                 f.write(
