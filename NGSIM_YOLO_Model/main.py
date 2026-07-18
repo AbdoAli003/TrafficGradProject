@@ -18,7 +18,7 @@ from ultralytics import YOLO
 model = YOLO("best.pt")
 
 # 2. Open your video
-video_path = r"dataset\lankershim-camera2-0830am-0845am.avi"
+video_path = r"dataset\peachtree-camera8-1245pm-0100pm.avi"
 cap = cv2.VideoCapture(video_path)
 
 if not cap.isOpened():
@@ -48,7 +48,7 @@ HUD_TEXT_COLOR = (255, 255, 255) # White text for the counter
 
 def click_event(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
-        print(f"📍 Clicked coordinates: (X: {x}, Y: {y})")
+        print(f"Clicked coordinates: (X: {x}, Y: {y})")
 
 print("Starting Upgraded ByteTrack Car Detection... Press 'q' to quit at any time.")
 print(f"Saving output to: {output_path}")
@@ -72,7 +72,7 @@ while cap.isOpened():
         frame,
         persist=True,
         tracker="bytetrack.yaml",
-        conf=0.60,
+        conf=0.5,
         verbose=False,
     )
 

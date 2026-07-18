@@ -81,7 +81,8 @@ while cap.isOpened():
     success, frame = cap.read()
     if not success:
         break
-
+    
+    frame = frame[0:425, 0:640]
     current_frame += 1
     annotated_frame = frame.copy()
 
@@ -101,7 +102,7 @@ while cap.isOpened():
 
     # Detect cars
     results = model.track(
-        frame, persist=True, tracker="bytetrack.yaml", conf=0.60, verbose=False
+        frame, persist=True, tracker="bytetrack.yaml", conf=0.50, verbose=False
     )
 
     if results[0].boxes is not None and len(results[0].boxes) > 0:
