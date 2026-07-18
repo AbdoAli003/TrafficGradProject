@@ -48,7 +48,7 @@ HUD_TEXT_COLOR = (255, 255, 255) # White text for the counter
 
 def click_event(event, x, y, flags, param):
     if event == cv2.EVENT_LBUTTONDOWN:
-        print(f"📍 Clicked coordinates: (X: {x}, Y: {y})")
+        print(f"Clicked coordinates: (X: {x}, Y: {y})")
 
 print("Starting Upgraded ByteTrack Car Detection... Press 'q' to quit at any time.")
 print(f"Saving output to: {output_path}")
