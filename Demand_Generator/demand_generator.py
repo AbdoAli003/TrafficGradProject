@@ -26,7 +26,18 @@ cap = cv2.VideoCapture(video_path)
 if not cap.isOpened():
     exit(f"Error: Could not open video at {video_path}")
 
+# Get video properties for the output file
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
 fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+# Define the codec and create VideoWriter object
+output_path = "output_tracked.avi"
+fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+# out = cv2.VideoWriter(output_path, fourcc, fps, (frame_width, frame_height))
+
+out = cv2.VideoWriter(output_path, fourcc, fps, (640, 425))
+
 if fps <= 0:
     fps = 30
 
@@ -200,12 +211,13 @@ while cap.isOpened():
             )
 
     cv2.imshow("Demand Extraction & Queue Detection", annotated_frame)
-
+    out.write(annotated_frame)
     # 1ms here because to run as fast as possible to process the video quickly
     if cv2.waitKey(1) & 0xFF == ord("q"):
         print("\nUser interrupted. Generating file with collected data...")
         break
-
+    
+out.release()
 cap.release()
 cv2.destroyAllWindows()
 
@@ -254,4 +266,6 @@ with open(output_file, "w") as f:
 print(
     f"\nSUCCESS! Wrote {valid_trips} physically possible trips out of {len(vehicle_demand)} tracked objects."
 )
+
 print("You can now load 'extracted_demand.rou.xml' into your SUMO configuration.")
+print("Video successfully saved.")
