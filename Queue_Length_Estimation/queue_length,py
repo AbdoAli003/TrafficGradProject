@@ -1,0 +1,252 @@
+import cv2
+import torch
+import numpy as np
+
+# --- PYTORCH 2.6 SECURITY PATCH ---
+_original_load = torch.load
+
+
+def _patched_load(*args, **kwargs):
+    kwargs["weights_only"] = False
+    return _original_load(*args, **kwargs)
+
+
+torch.load = _patched_load
+# ----------------------------------
+
+from ultralytics import YOLO
+
+# 1. Load the YOLO model
+model = YOLO(r"..\NGSIM_YOLO_Model\best.pt")
+
+# 2. Open your video
+video_path = r"..\NGSIM_YOLO_Model\dataset\lankershim-camera2-0830am-0845am.avi"
+cap = cv2.VideoCapture(video_path)
+
+if not cap.isOpened():
+    exit(f"Error: Could not open video at {video_path}")
+
+# Get video properties for the output file
+frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+fps = int(cap.get(cv2.CAP_PROP_FPS))
+
+# Define the codec and create VideoWriter object
+output_path = "output_tracked.avi"
+fourcc = cv2.VideoWriter_fourcc(*"MJPG")
+
+out = cv2.VideoWriter(output_path, fourcc, fps, (640, 425))
+
+if fps <= 0:
+    fps = 30
+
+# --- POLYGON SETUP ---
+poly1 = np.array([[150, 297], [346, 280], [350, 420], [204, 413]], np.int32).reshape(
+    (-1, 1, 2)
+)
+poly2 = np.array([[2, 111], [190, 92], [150, 297], [2, 289]], np.int32).reshape(
+    (-1, 1, 2)
+)
+poly3 = np.array([[198, 2], [320, 2], [348, 89], [190, 92]], np.int32).reshape(
+    (-1, 1, 2)
+)
+poly4 = np.array([[348, 89], [638, 105], [638, 268], [346, 280]], np.int32).reshape(
+    (-1, 1, 2)
+)
+poly5 = np.array([[190, 92], [348, 89], [346, 280], [150, 297]], np.int32).reshape(
+    (-1, 1, 2)
+)
+all_polygons = [poly1, poly2, poly3, poly4, poly5]
+
+polygon_colors = [(0, 0, 255), (0, 255, 0), (255, 0, 0), (0, 255, 255), (255, 0, 255)]
+
+# Human-readable names for each polygon, used in the on-screen queue overlay
+# and the end-of-run summary. Area 5 is the intersection box itself, not a
+# real approach, but we still report its stopped-vehicle count for completeness.
+QUEUE_AREA_NAMES = {
+    1: "South (Red)",
+    2: "West (Green)",
+    3: "North (Blue)",
+    4: "East (Yellow)",
+    5: "Center (Magenta)",
+}
+
+# --- TRACKING & QUEUE DETECTION VARIABLES ---
+vehicle_history = {}  # track_id -> list of (cx, cy)
+STOP_THRESHOLD_PIXELS = 5  # Max pixel movement to be considered "stopped"
+HISTORY_FRAMES = 15  # How many frames to look back (~0.5 seconds)
+
+# --- QUEUE LENGTH TRACKING ---
+# Number of stopped vehicles currently sitting inside each polygon, updated
+# every frame. This is the "queue length" (in vehicles) per approach.
+max_queue_counts = {idx: 0 for idx in range(1, len(all_polygons) + 1)}
+
+print("Detecting vehicles and measuring queue lengths...")
+print("Press 'q' to stop early and print the queue summary.")
+
+while cap.isOpened():
+    success, frame = cap.read()
+    if not success:
+        break
+    
+    frame = frame[0:425, 0:640]
+    annotated_frame = frame.copy()
+
+    # Draw polygons
+    for idx, (poly, color) in enumerate(zip(all_polygons, polygon_colors)):
+        cv2.polylines(annotated_frame, [poly], isClosed=True, color=color, thickness=2)
+        center_x, center_y = int(np.mean(poly[:, 0, 0])), int(np.mean(poly[:, 0, 1]))
+        cv2.putText(
+            annotated_frame,
+            str(idx + 1),
+            (center_x - 10, center_y + 10),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1,
+            color,
+            3,
+        )
+
+    # Reset this frame's per-polygon stopped-vehicle (queue) count
+    frame_queue_counts = {idx: 0 for idx in range(1, len(all_polygons) + 1)}
+
+    # Detect cars
+    results = model.track(
+        frame, persist=True, tracker="bytetrack.yaml", conf=0.50, verbose=False
+    )
+
+    if results[0].boxes is not None and len(results[0].boxes) > 0:
+        boxes = results[0].boxes.xyxy.cpu().numpy()
+        track_ids = (
+            results[0].boxes.id.cpu().numpy().astype(int)
+            if results[0].boxes.id is not None
+            else [None] * len(boxes)
+        )
+
+        for box, track_id in zip(boxes, track_ids):
+            if track_id is None:
+                continue
+
+            x1, y1, x2, y2 = map(int, box)
+            cx, cy = (x1 + x2) // 2, (y1 + y2) // 2
+
+            # --- QUEUE (STOPPED CAR) DETECTION LOGIC ---
+            if track_id not in vehicle_history:
+                vehicle_history[track_id] = []
+
+            vehicle_history[track_id].append((cx, cy))
+
+            if len(vehicle_history[track_id]) > HISTORY_FRAMES:
+                vehicle_history[track_id].pop(0)
+
+            is_stopped = False
+            if len(vehicle_history[track_id]) == HISTORY_FRAMES:
+                old_cx, old_cy = vehicle_history[track_id][0]
+                dist_moved = ((cx - old_cx) ** 2 + (cy - old_cy) ** 2) ** 0.5
+                if dist_moved < STOP_THRESHOLD_PIXELS:
+                    is_stopped = True
+
+            # --- POLYGON MEMBERSHIP: which approach area is this vehicle in? ---
+            area_idx_hit = None
+            for area_idx, poly in enumerate(all_polygons, start=1):
+                if cv2.pointPolygonTest(poly, (cx, cy), False) >= 0:
+                    area_idx_hit = area_idx
+                    break
+
+            # --- QUEUE LENGTH: count this vehicle if it's stopped inside a polygon ---
+            if area_idx_hit is not None and is_stopped:
+                frame_queue_counts[area_idx_hit] += 1
+
+            # --- DRAW VISUALS (COMPACT FLOATING CALLOUT) ---
+            # 1. Colors: Red (stopped), Cyan (moving)
+            box_color = (0, 0, 255) if is_stopped else (255, 255, 0)
+
+            # 2. Draw the Bounding Box
+            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), box_color, 2)
+
+            # 3. Create the clean label: "ID:XX (Reg)"
+            reg_num = str(area_idx_hit) if area_idx_hit else "N"
+            label = f"ID:{track_id} ({reg_num})"
+
+            # Text config: Reduced scale (0.4) for a smaller box
+            font = cv2.FONT_HERSHEY_SIMPLEX
+            font_scale = 0.4
+            thickness = 1
+
+            # Calculate text size
+            (tw, th), _ = cv2.getTextSize(label, font, font_scale, thickness)
+
+            # Position: 5 pixels above bounding box (tighter gap)
+            label_y = max(y1 - 5, 20)
+
+            # Draw Background Box 
+            cv2.rectangle(
+                annotated_frame,
+                (x1, label_y - th - 3),
+                (x1 + tw + 4, label_y + 3),
+                (0, 0, 0),
+                -1,
+            )
+
+            # Draw Text
+            cv2.putText(
+                annotated_frame,
+                label,
+                (x1 + 2, label_y),
+                font,
+                font_scale,
+                (255, 255, 255),
+                thickness,
+            )
+
+    # --- UPDATE RUNNING MAX QUEUE LENGTHS ---
+    for idx, count in frame_queue_counts.items():
+        if count > max_queue_counts[idx]:
+            max_queue_counts[idx] = count
+
+    # --- DRAW QUEUE LENGTH OVERLAY (per polygon, every frame) ---
+    for idx, (poly, color) in enumerate(zip(all_polygons, polygon_colors), start=1):
+        center_x, center_y = int(np.mean(poly[:, 0, 0])), int(np.mean(poly[:, 0, 1]))
+        queue_text = f"Q:{frame_queue_counts[idx]}"
+
+        (qtw, qth), _ = cv2.getTextSize(
+            queue_text, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2
+        )
+        text_x = center_x - qtw // 2
+        text_y = center_y + 35  # placed just below the polygon's number label
+
+        # Small black backing box so the count stays readable over the video
+        cv2.rectangle(
+            annotated_frame,
+            (text_x - 3, text_y - qth - 3),
+            (text_x + qtw + 3, text_y + 3),
+            (0, 0, 0),
+            -1,
+        )
+        cv2.putText(
+            annotated_frame,
+            queue_text,
+            (text_x, text_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.6,
+            color,
+            2,
+        )
+
+    cv2.imshow("Vehicle Tracking & Queue Detection", annotated_frame)
+    out.write(annotated_frame)
+    # 1ms here because to run as fast as possible to process the video quickly
+    if cv2.waitKey(1) & 0xFF == ord("q"):
+        print("\nUser interrupted. Wrapping up...")
+        break
+    
+out.release()
+cap.release()
+cv2.destroyAllWindows()
+
+# --- PRINT QUEUE LENGTH SUMMARY ---
+print("\n--- Max Queue Length Observed (vehicles) ---")
+for idx in range(1, len(all_polygons) + 1):
+    name = QUEUE_AREA_NAMES.get(idx, f"Area {idx}")
+    print(f"  Polygon {idx} [{name}]: {max_queue_counts[idx]} vehicles")
+
+print("\nVideo successfully saved.")
