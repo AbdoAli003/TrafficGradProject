@@ -42,7 +42,7 @@ if fps <= 0:
     fps = 30
 
 # --- POLYGON SETUP ---
-poly1 = np.array([[150, 297], [346, 297], [350, 420], [204, 413]], np.int32).reshape(
+poly1 = np.array([[150, 297], [346, 280], [350, 420], [204, 413]], np.int32).reshape(
     (-1, 1, 2)
 )
 poly2 = np.array([[2, 111], [190, 92], [150, 297], [2, 289]], np.int32).reshape(
@@ -51,10 +51,10 @@ poly2 = np.array([[2, 111], [190, 92], [150, 297], [2, 289]], np.int32).reshape(
 poly3 = np.array([[198, 2], [320, 2], [348, 89], [190, 92]], np.int32).reshape(
     (-1, 1, 2)
 )
-poly4 = np.array([[348, 89], [638, 105], [638, 268], [346, 297]], np.int32).reshape(
+poly4 = np.array([[348, 89], [638, 105], [638, 268], [346, 280]], np.int32).reshape(
     (-1, 1, 2)
 )
-poly5 = np.array([[190, 92], [348, 89], [346, 297], [150, 297]], np.int32).reshape(
+poly5 = np.array([[190, 92], [348, 89], [346, 280], [150, 297]], np.int32).reshape(
     (-1, 1, 2)
 )
 all_polygons = [poly1, poly2, poly3, poly4, poly5]
